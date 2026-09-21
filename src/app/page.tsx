@@ -1,69 +1,61 @@
-import Image from "next/image";
+import Link from "next/link";
+import { readSession } from "@/lib/session";
+import { redirect } from "next/navigation";
+import { MONTHLY_PRICE_USD, TRIAL_DAYS } from "@/lib/subscription";
 
-export default function Home() {
+export default async function Home() {
+  const session = await readSession();
+  if (session) redirect("/app");
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex-1 bg-bg">
+      <header className="flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
+        <div className="font-bold text-lg tracking-tight text-ink">🐖 Herdbook</div>
+        <nav className="flex gap-3">
+          <Link href="/login" className="btn">Log in</Link>
+          <Link href="/signup" className="btn btn-primary">Start free trial</Link>
+        </nav>
+      </header>
+
+      <main className="max-w-3xl mx-auto px-6 py-16 text-center">
+        <h1 className="text-4xl font-bold tracking-tight text-ink mb-4">
+          Run every farm's herd from one place.
+        </h1>
+        <p className="text-lg text-ink-soft mb-8">
+          Breeding, health, feed, sales and expenses — one account per farm, your own
+          team logins, and a dashboard that tells you what needs attention today.
+        </p>
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <Link href="/signup" className="btn btn-primary" style={{ padding: "12px 22px", fontSize: 14 }}>
+            Start your {TRIAL_DAYS}-day free trial
+          </Link>
+        </div>
+        <p className="text-sm text-muted">No card required to start. Cancel any time.</p>
+      </main>
+
+      <section className="max-w-3xl mx-auto px-6 py-10">
+        <div className="card p-8 text-center">
+          <div className="text-sm font-bold uppercase tracking-wide text-muted mb-2">Simple pricing</div>
+          <div className="text-5xl font-bold text-ink mb-1">
+            ${MONTHLY_PRICE_USD}<span className="text-lg font-medium text-muted">/month</span>
+          </div>
+          <p className="text-ink-soft mb-6">
+            Full access for your whole team. First {TRIAL_DAYS} days are free.
+          </p>
+          <ul className="text-left max-w-sm mx-auto space-y-2 text-sm text-ink-soft mb-6">
+            <li>✓ Unlimited pigs, breeding &amp; medical records</li>
+            <li>✓ Feed inventory, rations &amp; a daily feeding calendar</li>
+            <li>✓ Sales, expenses and a profit/loss dashboard</li>
+            <li>✓ Owner, manager and farm-worker logins with role-based access</li>
+          </ul>
+          <p className="text-xs text-muted">
+            Paid by local bank transfer — after signup, we'll show you where to send it and
+            confirm it within one business day.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </section>
+
+      <footer className="text-center text-xs text-muted py-10">Herdbook — farm management, made simple.</footer>
     </div>
   );
 }
