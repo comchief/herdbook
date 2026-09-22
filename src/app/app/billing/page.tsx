@@ -5,10 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { subscriptionStatus, daysRemaining, MONTHLY_PRICE_USD } from "@/lib/subscription";
 import { submitPaymentAction } from "@/lib/actions/payments";
 import { Icon } from "@/components/icons";
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+import { fmtDate } from "@/lib/format";
 
 export default async function BillingPage({
   searchParams,

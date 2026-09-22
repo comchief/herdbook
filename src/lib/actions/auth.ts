@@ -6,6 +6,7 @@ import { db, schema } from "@/db";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { setSessionCookie, clearSessionCookie, readSession } from "@/lib/session";
 import { TRIAL_DAYS } from "@/lib/subscription";
+import { revalidatePath } from "next/cache";
 
 function addDays(d: Date, days: number) {
   const copy = new Date(d);
@@ -83,6 +84,23 @@ export async function loginAction(formData: FormData) {
 export async function logoutAction() {
   await clearSessionCookie();
   redirect("/login");
+}
+
+/** Lets any signed-in user (owner, manager, or worker) rename their own
+ * account — the profile menu's "Edit profile" link. Does not touch email,
+ * password, or role. */
+export async function updateProfileAction(formData: FormData) {
+  const session = await readSession();
+  if (!session) redirect("/login");
+
+  const name = String(formData.get("name") || "").trim();
+  if (!name) {
+    redirect("/app/profile?error=" + encodeURIComponent("Name can't be empty."));
+  }
+
+  await db.update(schema.users).set({ name }).where(eq(schema.users.id, session!.userId));
+  revalidatePath("/app", "layout");
+  redirect("/app/profile?saved=1");
 }
 
 /** Used by the team-accounts screen: an owner creates additional logins for

@@ -5,6 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { getFarmUnit } from "@/lib/gate";
+import { displayToKg } from "@/lib/units";
 
 async function requireManagerSession() {
   const session = await readSession();
@@ -58,7 +60,11 @@ export async function createPigAction(formData: FormData) {
     .limit(1);
   if (clash) redirect("/app/pigs?error=" + encodeURIComponent("That ear tag is already in use."));
 
-  const weight = num(formData, "weight");
+  const unit = await getFarmUnit(session.farmId);
+  const weightInput = num(formData, "weight");
+  const targetWeightInput = num(formData, "targetWeightKg");
+  const weight = weightInput === null ? null : displayToKg(weightInput, unit);
+  const targetWeightKg = targetWeightInput === null ? null : displayToKg(targetWeightInput, unit);
   await db.insert(schema.pigs).values({
     farmId: session.farmId,
     tag,
@@ -71,7 +77,7 @@ export async function createPigAction(formData: FormData) {
     currentWeightKg: weight ?? 0,
     sireTag: str(formData, "sireTag") || null,
     damTag: str(formData, "damTag") || null,
-    targetWeightKg: num(formData, "targetWeightKg"),
+    targetWeightKg,
     targetMonths: num(formData, "targetMonths"),
     notes: str(formData, "notes") || null,
     acquiredDate: acquiredDate,
@@ -109,7 +115,11 @@ export async function updatePigAction(formData: FormData) {
     if (clash) redirect("/app/pigs?error=" + encodeURIComponent("That ear tag is already in use."));
   }
 
-  const newWeight = num(formData, "weight");
+  const unit = await getFarmUnit(session.farmId);
+  const newWeightInput = num(formData, "weight");
+  const newTargetWeightInput = num(formData, "targetWeightKg");
+  const newWeight = newWeightInput === null ? null : displayToKg(newWeightInput, unit);
+  const newTargetWeightKg = newTargetWeightInput === null ? null : displayToKg(newTargetWeightInput, unit);
   const weightChanged = newWeight !== null && newWeight !== pig!.currentWeightKg;
   await db
     .update(schema.pigs)
@@ -125,7 +135,7 @@ export async function updatePigAction(formData: FormData) {
       currentWeightKg: newWeight ?? pig!.currentWeightKg,
       sireTag: str(formData, "sireTag") || null,
       damTag: str(formData, "damTag") || null,
-      targetWeightKg: num(formData, "targetWeightKg"),
+      targetWeightKg: newTargetWeightKg,
       targetMonths: num(formData, "targetMonths"),
       notes: str(formData, "notes") || null,
       updatedAt: new Date(),

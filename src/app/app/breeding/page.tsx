@@ -4,14 +4,14 @@ import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createBreedingAction, logFarrowOutcomeAction, deleteBreedingAction } from "@/lib/actions/breeding";
 import { Icon } from "@/components/icons";
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+import { fmtDate } from "@/lib/format";
+import { weightUnitLabel } from "@/lib/units";
 
 export default async function BreedingPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();
-  await requireActiveFarm(session);
+  const farm = await requireActiveFarm(session);
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
+  const unitLabel = weightUnitLabel(unit);
   const { error } = await searchParams;
   const isManager = session.role !== "worker";
 
@@ -142,7 +142,7 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
                             <input type="number" min="0" name="pigletsWeaned" />
                           </div>
                           <div className="field">
-                            <label>Total litter weight (kg)</label>
+                            <label>Total litter weight ({unitLabel})</label>
                             <input type="number" step="0.1" min="0" name="totalLitterWeightKg" />
                           </div>
                           <button type="submit" className="btn btn-primary btn-small w-full justify-center">

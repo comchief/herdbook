@@ -6,7 +6,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { LineChart, type LinePoint } from "@/components/charts";
-import { growthStatus } from "@/lib/growth";
+import { growthStatus, timeToMarket } from "@/lib/growth";
+import { fmtDate, fmtDateShort } from "@/lib/format";
+import { kgToDisplay, weightUnitLabel, fmtWeight } from "@/lib/units";
+import { classifySex } from "@/lib/pig-classification";
 
 const STATUS_STYLE: Record<string, { cls: string; label: string }> = {
   piglet: { cls: "info", label: "Piglet" },
@@ -24,13 +27,12 @@ function ageLabel(d: Date) {
   return `${(days / 30.44).toFixed(0)}mo`;
 }
 
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 
 export default async function PigProfilePage({ params }: { params: Promise<{ tag: string }> }) {
   const session = await requireSession();
-  await requireActiveFarm(session);
+  const farm = await requireActiveFarm(session);
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
+  const unitLabel = weightUnitLabel(unit);
   const isManager = session.role !== "worker";
   const { tag } = await params;
   const decodedTag = decodeURIComponent(tag);
@@ -56,11 +58,12 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
 
   const s = STATUS_STYLE[pig!.status] ?? { cls: "muted", label: pig!.status };
   const g = growthStatus(pig!);
+  const ttm = timeToMarket(pig!);
 
   const weightLog = Array.isArray(pig!.weightLog) ? (pig!.weightLog as { date: string; weightKg: number }[]) : [];
   const weightPoints: LinePoint[] = weightLog.map((e) => ({
-    label: new Date(e.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-    value: e.weightKg,
+    label: fmtDateShort(new Date(e.date)),
+    value: kgToDisplay(e.weightKg, unit),
   }));
 
   const ageText = pig!.dob ? ageLabel(pig!.dob) : pig!.acquiredDate ? `${ageLabel(pig!.acquiredDate)}*` : "—";
@@ -100,7 +103,7 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
             <Icon name="scale" />
             Weight
           </div>
-          <div className="v num">{pig!.currentWeightKg.toFixed(1)} kg</div>
+          <div className="v num">{fmtWeight(pig!.currentWeightKg, unit)}</div>
         </div>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k">
@@ -127,6 +130,40 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
         </div>
       </div>
 
+      {ttm && (
+        <div className="card p-5 mb-3.5">
+          <div className="flex items-center justify-between mb-3.5">
+            <h3 className="font-semibold text-[15.5px]">Time to market</h3>
+            <span className={`badge badge-${ttm.cls}`}>{ttm.label}</span>
+          </div>
+          <div className="fg-bar mb-4" style={{ height: 10 }}>
+            <i className={ttm.cls === "good" ? "" : ttm.cls} style={{ width: `${ttm.timeProgressPct}%` }} />
+          </div>
+          <div className="flex flex-col gap-2.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted">Current</span>
+              <span className="font-semibold num">
+                {fmtWeight(ttm.currentWeightKg, unit)} of {fmtWeight(ttm.targetWeightKg, unit)} target ({ttm.weightPct}%)
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Expected at this age</span>
+              <span className="font-semibold num">{fmtWeight(ttm.expectedWeightKg, unit)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Target</span>
+              <span className="font-semibold">
+                {ttm.targetMonths} months from {ttm.ageRefIsDob ? "birth" : "acquired date"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">{ttm.daysDiff >= 0 ? "Days past target date" : "Days until target date"}</span>
+              <span className="font-semibold num">{Math.abs(ttm.daysDiff)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card p-5 mb-3.5">
         <h2 className="font-bold text-ink mb-3.5">Details</h2>
         <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
@@ -136,7 +173,7 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-muted">Sex</span>
-            <span className="font-semibold">{pig!.sexBase}</span>
+            <span className="font-semibold">{classifySex(pig!)}</span>
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-muted">Pen / location</span>
@@ -148,7 +185,7 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-muted">Acquired date</span>
-            <span className="font-semibold num">{pig!.acquiredDate ? fmtDate(pig!.acquiredDate) : "—"}</span>
+            <span className="font-semibold num">{pig!.acquiredDate ? fmtDate(pig!.acquiredDate) : "N/A"}</span>
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-muted">Sire</span>
@@ -172,7 +209,7 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-muted">Target weight</span>
-            <span className="font-semibold num">{pig!.targetWeightKg ? `${pig!.targetWeightKg} kg` : "—"}</span>
+            <span className="font-semibold num">{pig!.targetWeightKg ? fmtWeight(pig!.targetWeightKg, unit) : "—"}</span>
           </div>
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-muted">Target months to market</span>
@@ -192,7 +229,7 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
           <h3 className="font-semibold text-[15.5px]">Weight history</h3>
           <span className="text-[11.5px] text-muted">from recorded weigh-ins</span>
         </div>
-        <LineChart points={weightPoints} valueFormat={(n) => `${n.toFixed(1)} kg`} />
+        <LineChart points={weightPoints} valueFormat={(n) => `${n.toFixed(1)} ${unitLabel}`} />
       </div>
 
       {recentMedical.length > 0 && (

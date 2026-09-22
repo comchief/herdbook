@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { Donut, LineChart, categoricalColor } from "@/components/charts";
 import { herdWeightTrend, herdComposition } from "@/lib/dashboard-charts";
+import { fmtDate } from "@/lib/format";
+import { kgToDisplay, weightUnitLabel, fmtWeight } from "@/lib/units";
 
 function fmtMoney(n: number, currency: string) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -13,15 +15,14 @@ function fmtMoney(n: number, currency: string) {
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 
 export default async function DashboardPage() {
   const session = await requireSession();
   const farm = await requireActiveFarm(session);
   const isManager = session.role !== "worker";
   const farmId = session.farmId;
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
+  const unitLabel = weightUnitLabel(unit);
 
   const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs] = await Promise.all([
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, farmId)),
@@ -70,14 +71,14 @@ export default async function DashboardPage() {
     if (f.stockKg < f.reorderLevelKg) {
       tasks.push({
         title: `${f.feedType} below reorder point`,
-        sub: `${f.stockKg.toFixed(0)} kg on hand · reorder at ${f.reorderLevelKg.toFixed(0)} kg`,
+        sub: `${fmtWeight(f.stockKg, unit, 0)} on hand · reorder at ${fmtWeight(f.reorderLevelKg, unit, 0)}`,
         cls: "critical",
         href: "/app/feed",
       });
     }
   }
 
-  const weightTrend = herdWeightTrend(pigs);
+  const weightTrend = herdWeightTrend(pigs).map((p) => ({ ...p, value: kgToDisplay(p.value, unit) }));
   const composition = herdComposition(pigs);
 
   const yr = today.getFullYear().toString();
@@ -117,7 +118,7 @@ export default async function DashboardPage() {
         </div>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="wheat" />Feed on hand</div>
-          <div className="v num">{totalFeedKg.toFixed(0)} kg</div>
+          <div className="v num">{fmtWeight(totalFeedKg, unit, 0)}</div>
         </div>
         {isManager && (
           <div className="card stat-tile p-[17px_18px]">
@@ -133,7 +134,7 @@ export default async function DashboardPage() {
             <h3 className="font-semibold text-[15.5px]">Herd weight trend</h3>
             <span className="text-[11.5px] text-muted">recorded biomass, by month</span>
           </div>
-          <LineChart points={weightTrend} valueFormat={(n) => `${n.toLocaleString()} kg`} />
+          <LineChart points={weightTrend} valueFormat={(n) => `${n.toLocaleString()} ${unitLabel}`} />
         </div>
         {isManager && (
           <div className="card p-5">

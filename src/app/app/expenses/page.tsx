@@ -4,10 +4,8 @@ import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createExpenseAction, deleteExpenseAction } from "@/lib/actions/expenses";
 import { Icon } from "@/components/icons";
+import { fmtDate } from "@/lib/format";
 
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 function fmtMoney(n: number, currency: string) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
 }

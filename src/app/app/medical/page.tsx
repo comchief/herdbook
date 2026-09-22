@@ -4,10 +4,7 @@ import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createMedicalAction, dismissFollowupAction, deleteMedicalAction } from "@/lib/actions/medical";
 import { Icon } from "@/components/icons";
-
-function fmtDate(d: Date | null) {
-  return d ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
-}
+import { fmtDate } from "@/lib/format";
 
 export default async function MedicalPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();

@@ -5,6 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { getFarmUnit } from "@/lib/gate";
+import { displayToKg } from "@/lib/units";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -78,7 +80,9 @@ export async function logFarrowOutcomeAction(formData: FormData) {
   const actualFarrowDate = str(formData, "actualFarrowDate");
   const litterSize = num(formData, "litterSize");
   const pigletsWeaned = num(formData, "pigletsWeaned");
-  const totalLitterWeightKg = num(formData, "totalLitterWeightKg");
+  const litterWeightInput = num(formData, "totalLitterWeightKg");
+  const unit = await getFarmUnit(session.farmId);
+  const totalLitterWeightKg = litterWeightInput === null ? null : displayToKg(litterWeightInput, unit);
 
   const [record] = await db
     .select()

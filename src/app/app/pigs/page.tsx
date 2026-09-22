@@ -7,7 +7,8 @@ import { PigsTable } from "@/components/pigs-table";
 
 export default async function PigsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();
-  await requireActiveFarm(session);
+  const farm = await requireActiveFarm(session);
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const { error } = await searchParams;
   const isManager = session.role !== "worker";
 
@@ -32,7 +33,7 @@ export default async function PigsPage({ searchParams }: { searchParams: Promise
       </div>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <PigsTable pigs={pigs} isManager={isManager} />
+      <PigsTable pigs={pigs} isManager={isManager} unit={unit} />
     </div>
   );
 }

@@ -21,3 +21,10 @@ export async function loadFarm(session: SessionPayload) {
   if (!farm) redirect("/login");
   return farm!;
 }
+
+/** Lightweight lookup for server actions that need to convert a submitted
+ * weight into canonical kg but don't otherwise load the farm record. */
+export async function getFarmUnit(farmId: string): Promise<"kg" | "lbs"> {
+  const [farm] = await db.select({ unit: schema.farms.unit }).from(schema.farms).where(eq(schema.farms.id, farmId)).limit(1);
+  return farm?.unit === "lbs" ? "lbs" : "kg";
+}

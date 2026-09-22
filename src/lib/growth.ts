@@ -53,3 +53,47 @@ export function growthStatus(pig: PigForGrowth): GrowthStatus {
   const pct = Math.round((1 - ratio) * 100);
   return { label: "Behind", pct: Math.max(pct, 1), cls: "critical" };
 }
+
+/** Fuller breakdown for the "Time to market" card on a pig's profile page —
+ * same eligibility and On track/Behind/Overdue classification as
+ * growthStatus above, plus the raw figures the card displays (weights stay
+ * in canonical kg; the page converts to the farm's display unit). */
+export type TimeToMarket = {
+  label: "On track" | "Behind" | "Overdue";
+  cls: "good" | "warn" | "critical";
+  currentWeightKg: number;
+  targetWeightKg: number;
+  weightPct: number;
+  expectedWeightKg: number;
+  targetMonths: number;
+  ageRefIsDob: boolean;
+  timeProgressPct: number;
+  daysDiff: number;
+} | null;
+
+export function timeToMarket(pig: PigForGrowth): TimeToMarket {
+  const g = growthStatus(pig);
+  if (!g) return null;
+  const ageMonths = ageMonthsOf(pig);
+  const ref = pig.dob ?? pig.acquiredDate;
+  if (ageMonths === null || !ref || !pig.targetWeightKg || !pig.targetMonths) return null;
+
+  const expectedWeightKg = Math.min(pig.targetWeightKg, pig.targetWeightKg * (ageMonths / pig.targetMonths));
+  const weightPct = Math.round((pig.currentWeightKg / pig.targetWeightKg) * 100);
+  const timeProgressPct = Math.round(Math.min(ageMonths / pig.targetMonths, 1) * 100);
+  const targetDate = new Date(ref.getTime() + pig.targetMonths * MS_PER_MONTH);
+  const daysDiff = Math.round((Date.now() - targetDate.getTime()) / 86400000);
+
+  return {
+    label: g.label,
+    cls: g.cls,
+    currentWeightKg: pig.currentWeightKg,
+    targetWeightKg: pig.targetWeightKg,
+    weightPct,
+    expectedWeightKg,
+    targetMonths: pig.targetMonths,
+    ageRefIsDob: pig.dob != null,
+    timeProgressPct,
+    daysDiff,
+  };
+}

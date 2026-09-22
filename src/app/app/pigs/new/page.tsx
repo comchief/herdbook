@@ -5,10 +5,13 @@ import { eq } from "drizzle-orm";
 import { createPigAction } from "@/lib/actions/pigs";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
+import { weightUnitLabel } from "@/lib/units";
 
 export default async function NewPigPage() {
   const session = await requireManager();
-  await requireActiveFarm(session);
+  const farm = await requireActiveFarm(session);
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
+  const unitLabel = weightUnitLabel(unit);
 
   const pigs = await db.select().from(schema.pigs).where(eq(schema.pigs.farmId, session.farmId));
   const boars = pigs.filter((p) => p.status === "breeding-boar");
@@ -47,8 +50,8 @@ export default async function NewPigPage() {
             <input type="date" name="dob" />
           </div>
           <div className="field">
-            <label>Acquired date</label>
-            <input type="date" name="acquiredDate" defaultValue={new Date().toISOString().slice(0, 10)} />
+            <label>Acquired date (optional)</label>
+            <input type="date" name="acquiredDate" />
           </div>
           <div className="field">
             <label>Status</label>
@@ -66,8 +69,8 @@ export default async function NewPigPage() {
             <input name="pen" placeholder="Grower Barn A" />
           </div>
           <div className="field">
-            <label>Current weight (kg)</label>
-            <input type="number" step="0.1" min="0" name="weight" required placeholder="24.5" />
+            <label>Current weight ({unitLabel})</label>
+            <input type="number" step="0.1" min="0" name="weight" required placeholder={unit === "lbs" ? "54" : "24.5"} />
           </div>
           <div className="field">
             <label>Sire (boar)</label>
@@ -92,8 +95,8 @@ export default async function NewPigPage() {
             </select>
           </div>
           <div className="field">
-            <label>Target market weight (kg)</label>
-            <input type="number" step="0.1" min="0" name="targetWeightKg" placeholder="120" />
+            <label>Target market weight ({unitLabel})</label>
+            <input type="number" step="0.1" min="0" name="targetWeightKg" placeholder={unit === "lbs" ? "265" : "120"} />
           </div>
           <div className="field">
             <label>Target months to market</label>

@@ -106,6 +106,10 @@ export function IconSprite() {
         <path d="M3 17l6-6 4 4 8-8" />
         <path d="M15 7h6v6" />
       </symbol>
+      <symbol id="ic-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="3.6" />
+        <path d="M4.5 20c1-4 4-6.2 7.5-6.2S18.5 16 19.5 20" />
+      </symbol>
     </svg>
   );
 }

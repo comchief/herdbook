@@ -5,6 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { getFarmUnit } from "@/lib/gate";
+import { displayToKg, displayCostToKg } from "@/lib/units";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -33,12 +35,13 @@ export async function createRationAction(formData: FormData) {
     .limit(1);
   if (clash) redirect("/app/feed?error=" + encodeURIComponent("That ration already exists."));
 
+  const unit = await getFarmUnit(session.farmId);
   await db.insert(schema.feedInventory).values({
     farmId: session.farmId,
     feedType,
-    stockKg: num(formData, "stockKg"),
-    reorderLevelKg: num(formData, "reorderLevelKg"),
-    costPerKg: num(formData, "costPerKg"),
+    stockKg: displayToKg(num(formData, "stockKg"), unit),
+    reorderLevelKg: displayToKg(num(formData, "reorderLevelKg"), unit),
+    costPerKg: displayCostToKg(num(formData, "costPerKg"), unit),
   });
   revalidatePath("/app/feed");
   redirect("/app/feed");
@@ -47,12 +50,13 @@ export async function createRationAction(formData: FormData) {
 export async function updateRationAction(formData: FormData) {
   const session = await requireManagerSession();
   const id = str(formData, "id");
+  const unit = await getFarmUnit(session.farmId);
   await db
     .update(schema.feedInventory)
     .set({
-      stockKg: num(formData, "stockKg"),
-      reorderLevelKg: num(formData, "reorderLevelKg"),
-      costPerKg: num(formData, "costPerKg"),
+      stockKg: displayToKg(num(formData, "stockKg"), unit),
+      reorderLevelKg: displayToKg(num(formData, "reorderLevelKg"), unit),
+      costPerKg: displayCostToKg(num(formData, "costPerKg"), unit),
     })
     .where(and(eq(schema.feedInventory.farmId, session.farmId), eq(schema.feedInventory.id, id)));
   revalidatePath("/app/feed");
@@ -63,7 +67,8 @@ export async function logFeedMovementAction(formData: FormData) {
   const session = await requireManagerSession();
   const feedType = str(formData, "feedType");
   const direction = str(formData, "direction") === "usage" ? "usage" : "purchase";
-  const quantityKg = num(formData, "quantityKg");
+  const unit = await getFarmUnit(session.farmId);
+  const quantityKg = displayToKg(num(formData, "quantityKg"), unit);
   const date = str(formData, "date");
   if (!feedType || quantityKg <= 0 || !date) redirect("/app/feed?error=" + encodeURIComponent("Ration, date and a positive quantity are required."));
 
@@ -135,13 +140,15 @@ export async function assignPenFeedAction(formData: FormData) {
   const pigIds = formData.getAll("pigId").map(String);
   const rations = formData.getAll("feedRation").map(String);
   const amounts = formData.getAll("dailyFeedKg").map(String);
+  const unit = await getFarmUnit(session.farmId);
 
   for (let i = 0; i < pigIds.length; i++) {
     const ration = rations[i]?.trim() || null;
-    const amount = amounts[i] === "" || amounts[i] == null ? null : Number(amounts[i]);
+    const rawAmount = amounts[i] === "" || amounts[i] == null ? null : Number(amounts[i]);
+    const amount = rawAmount !== null && Number.isFinite(rawAmount) ? displayToKg(rawAmount, unit) : null;
     await db
       .update(schema.pigs)
-      .set({ feedRation: ration, dailyFeedKg: Number.isFinite(amount as number) ? amount : null })
+      .set({ feedRation: ration, dailyFeedKg: amount })
       .where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.id, pigIds[i])));
   }
 

@@ -47,6 +47,10 @@ export function Topbar({
           <Icon name="chevron-down" className="chev" />
         </summary>
         <div className="profile-dropdown">
+          <Link href="/app/profile">
+            <Icon name="user" />
+            Edit profile
+          </Link>
           {isOwner && (
             <>
               <Link href="/app/settings">
@@ -61,9 +65,9 @@ export function Topbar({
                 <Icon name="card" />
                 Billing
               </Link>
-              <hr />
             </>
           )}
+          <hr />
           <form action={logoutAction}>
             <button type="submit">
               <Icon name="logout" />

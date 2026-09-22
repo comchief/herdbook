@@ -2,10 +2,7 @@ import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { approvePaymentAction, rejectPaymentAction } from "@/lib/actions/payments";
 import { Icon } from "@/components/icons";
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+import { fmtDate } from "@/lib/format";
 
 export default async function AdminPaymentsPage() {
   const pending = await db

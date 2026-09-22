@@ -5,6 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { getFarmUnit } from "@/lib/gate";
+import { displayToKg, displayCostToKg } from "@/lib/units";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -26,11 +28,21 @@ export async function createSaleAction(formData: FormData) {
   const date = str(formData, "date");
   if (!date) redirect("/app/sales?error=" + encodeURIComponent("Date is required."));
 
-  const liveWeightKg = num(formData, "liveWeightKg") || null;
-  const carcassWeightKg = num(formData, "carcassWeightKg") || null;
+  // Compute revenue from the raw, consistent display-unit values first —
+  // multiplying price-per-unit by weight is unit-invariant as long as both
+  // operands are in the same unit, so this stays correct regardless of the
+  // farm's chosen display unit. Only afterward do we convert the individual
+  // fields to canonical kg-based storage.
+  const liveWeightInput = num(formData, "liveWeightKg") || null;
+  const carcassWeightInput = num(formData, "carcassWeightKg") || null;
   const pricePerUnit = num(formData, "pricePerUnit");
-  const basisWeight = carcassWeightKg ?? liveWeightKg ?? 0;
+  const basisWeight = carcassWeightInput ?? liveWeightInput ?? 0;
   const revenue = pricePerUnit * basisWeight;
+
+  const unit = await getFarmUnit(session.farmId);
+  const liveWeightKg = liveWeightInput === null ? null : displayToKg(liveWeightInput, unit);
+  const carcassWeightKg = carcassWeightInput === null ? null : displayToKg(carcassWeightInput, unit);
+  const pricePerKg = displayCostToKg(pricePerUnit, unit);
 
   await db.insert(schema.sales).values({
     farmId: session.farmId,
@@ -39,7 +51,7 @@ export async function createSaleAction(formData: FormData) {
     channel: str(formData, "channel") || "live",
     liveWeightKg,
     carcassWeightKg,
-    pricePerUnit,
+    pricePerUnit: pricePerKg,
     revenue,
     buyer: str(formData, "buyer") || null,
   });

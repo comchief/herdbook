@@ -4,10 +4,9 @@ import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createSaleAction, deleteSaleAction } from "@/lib/actions/sales";
 import { Icon } from "@/components/icons";
+import { fmtDate } from "@/lib/format";
+import { weightUnitLabel } from "@/lib/units";
 
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 function fmtMoney(n: number, currency: string) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
 }
@@ -15,6 +14,8 @@ function fmtMoney(n: number, currency: string) {
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireManager();
   const farm = await requireActiveFarm(session);
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
+  const unitLabel = weightUnitLabel(unit);
   const { error } = await searchParams;
 
   const [sales, pigs] = await Promise.all([
@@ -72,15 +73,15 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
             <input name="buyer" />
           </div>
           <div className="field">
-            <label>Live weight (kg)</label>
+            <label>Live weight ({unitLabel})</label>
             <input type="number" step="0.1" min="0" name="liveWeightKg" />
           </div>
           <div className="field">
-            <label>Carcass weight (kg)</label>
+            <label>Carcass weight ({unitLabel})</label>
             <input type="number" step="0.1" min="0" name="carcassWeightKg" />
           </div>
           <div className="field">
-            <label>Price / kg</label>
+            <label>Price / {unitLabel}</label>
             <input type="number" step="0.01" min="0" name="pricePerUnit" required />
           </div>
           <div>

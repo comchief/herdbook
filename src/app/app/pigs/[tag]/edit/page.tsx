@@ -6,10 +6,13 @@ import { updatePigAction } from "@/lib/actions/pigs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
+import { weightUnitLabel, displayValue } from "@/lib/units";
 
 export default async function EditPigPage({ params }: { params: Promise<{ tag: string }> }) {
   const session = await requireManager();
-  await requireActiveFarm(session);
+  const farm = await requireActiveFarm(session);
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
+  const unitLabel = weightUnitLabel(unit);
   const { tag } = await params;
   const decodedTag = decodeURIComponent(tag);
 
@@ -61,7 +64,7 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
             <input type="date" name="dob" defaultValue={dobStr} />
           </div>
           <div className="field">
-            <label>Acquired date</label>
+            <label>Acquired date (optional)</label>
             <input type="date" name="acquiredDate" defaultValue={acquiredDateStr} />
           </div>
           <div className="field">
@@ -80,8 +83,8 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
             <input name="pen" defaultValue={pig!.pen ?? ""} />
           </div>
           <div className="field">
-            <label>Current weight (kg)</label>
-            <input type="number" step="0.1" min="0" name="weight" defaultValue={pig!.currentWeightKg} required />
+            <label>Current weight ({unitLabel})</label>
+            <input type="number" step="0.1" min="0" name="weight" defaultValue={displayValue(pig!.currentWeightKg, unit)} required />
           </div>
           <div className="field">
             <label>Sire (boar)</label>
@@ -106,8 +109,8 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
             </select>
           </div>
           <div className="field">
-            <label>Target market weight (kg)</label>
-            <input type="number" step="0.1" min="0" name="targetWeightKg" defaultValue={pig!.targetWeightKg ?? ""} />
+            <label>Target market weight ({unitLabel})</label>
+            <input type="number" step="0.1" min="0" name="targetWeightKg" defaultValue={displayValue(pig!.targetWeightKg, unit)} />
           </div>
           <div className="field">
             <label>Target months to market</label>

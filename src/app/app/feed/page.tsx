@@ -10,14 +10,14 @@ import {
   assignPenFeedAction,
 } from "@/lib/actions/feed";
 import { Gauge } from "@/components/charts";
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+import { fmtDate } from "@/lib/format";
+import { displayValue, weightUnitLabel, fmtWeight, kgCostToDisplay } from "@/lib/units";
 
 export default async function FeedPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();
-  await requireActiveFarm(session);
+  const farm = await requireActiveFarm(session);
+  const unit = farm.unit === "lbs" ? "lbs" : "kg";
+  const unitLabel = weightUnitLabel(unit);
   const { error } = await searchParams;
   const isManager = session.role !== "worker";
 
@@ -51,7 +51,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                 <div className="flex-1 min-w-0">
                   <Gauge
                     label={f.feedType}
-                    sub={`${f.stockKg.toFixed(0)} kg · reorder at ${f.reorderLevelKg.toFixed(0)} kg`}
+                    sub={`${fmtWeight(f.stockKg, unit, 0)} · reorder at ${fmtWeight(f.reorderLevelKg, unit, 0)}`}
                     fraction={f.stockKg / ceiling}
                     tone={tone}
                   />
@@ -62,16 +62,16 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                     <form action={updateRationAction} className="card p-4 absolute right-0 z-10 w-60 mt-2 space-y-2 text-left">
                       <input type="hidden" name="id" value={f.id} />
                       <div className="field">
-                        <label>Stock (kg)</label>
-                        <input type="number" step="1" name="stockKg" defaultValue={f.stockKg} />
+                        <label>Stock ({unitLabel})</label>
+                        <input type="number" step="1" name="stockKg" defaultValue={displayValue(f.stockKg, unit, 0)} />
                       </div>
                       <div className="field">
-                        <label>Reorder at (kg)</label>
-                        <input type="number" step="1" name="reorderLevelKg" defaultValue={f.reorderLevelKg} />
+                        <label>Reorder at ({unitLabel})</label>
+                        <input type="number" step="1" name="reorderLevelKg" defaultValue={displayValue(f.reorderLevelKg, unit, 0)} />
                       </div>
                       <div className="field">
-                        <label>Cost / kg</label>
-                        <input type="number" step="0.01" name="costPerKg" defaultValue={f.costPerKg} />
+                        <label>Cost / {unitLabel}</label>
+                        <input type="number" step="0.01" name="costPerKg" defaultValue={kgCostToDisplay(f.costPerKg, unit).toFixed(4)} />
                       </div>
                       <button type="submit" className="btn btn-primary btn-small w-full justify-center">
                         Save
@@ -93,15 +93,15 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                 <input name="feedType" required placeholder="Grower pellets" />
               </div>
               <div className="field">
-                <label>Starting stock (kg)</label>
+                <label>Starting stock ({unitLabel})</label>
                 <input type="number" step="1" min="0" name="stockKg" />
               </div>
               <div className="field">
-                <label>Reorder at (kg)</label>
+                <label>Reorder at ({unitLabel})</label>
                 <input type="number" step="1" min="0" name="reorderLevelKg" />
               </div>
               <div className="field">
-                <label>Cost / kg</label>
+                <label>Cost / {unitLabel}</label>
                 <input type="number" step="0.01" min="0" name="costPerKg" />
               </div>
               <div className="col-span-2 md:col-span-4">
@@ -140,7 +140,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                       {onPlan.length} / {penPigs.length}
                     </td>
                     <td>{rationNames.length === 0 ? "—" : rationNames.length === 1 ? rationNames[0] : "Mixed"}</td>
-                    <td className="num">{dailyKg.toFixed(1)} kg</td>
+                    <td className="num">{fmtWeight(dailyKg, unit)}</td>
                     {isManager && (
                       <td className="text-right">
                         <details className="relative inline-block">
@@ -164,8 +164,8 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                                   </select>
                                 </div>
                                 <div className="field w-24">
-                                  <label>kg/day</label>
-                                  <input type="number" step="0.1" min="0" name="dailyFeedKg" defaultValue={p.dailyFeedKg ?? ""} />
+                                  <label>{unitLabel}/day</label>
+                                  <input type="number" step="0.1" min="0" name="dailyFeedKg" defaultValue={displayValue(p.dailyFeedKg, unit)} />
                                 </div>
                               </div>
                             ))}
@@ -220,7 +220,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                   <input type="date" name="date" required />
                 </div>
                 <div className="field">
-                  <label>Quantity (kg)</label>
+                  <label>Quantity ({unitLabel})</label>
                   <input type="number" step="1" min="0" name="quantityKg" required />
                 </div>
                 <div className="field">
@@ -253,7 +253,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                     <td>
                       <span className={`badge ${l.direction === "purchase" ? "badge-good" : "badge-muted"}`}>{l.direction}</span>
                     </td>
-                    <td className="num">{l.quantityKg.toFixed(0)} kg</td>
+                    <td className="num">{fmtWeight(l.quantityKg, unit, 0)}</td>
                     <td className="num">{l.costTotal ? `$${l.costTotal.toFixed(2)}` : "—"}</td>
                     <td className="text-right">
                       <form action={deleteFeedLogAction} className="inline">

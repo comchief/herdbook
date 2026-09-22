@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { growthStatus } from "@/lib/growth";
 import { deletePigAction } from "@/lib/actions/pigs";
+import { fmtWeight, type WeightUnit } from "@/lib/units";
+import { classifySex } from "@/lib/pig-classification";
 
 export type PigRow = {
   id: string;
@@ -73,7 +75,7 @@ function GrowthBadge({ pig }: { pig: PigRow }) {
   return <span className={`badge badge-${g.cls}`}>{g.label} · {g.pct}%</span>;
 }
 
-export function PigsTable({ pigs, isManager }: { pigs: PigRow[]; isManager: boolean }) {
+export function PigsTable({ pigs, isManager, unit }: { pigs: PigRow[]; isManager: boolean; unit: WeightUnit }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
 
@@ -145,10 +147,10 @@ export function PigsTable({ pigs, isManager }: { pigs: PigRow[]; isManager: bool
                 <td className="font-semibold">{p.name}</td>
                 <td className="tag">{p.tag}</td>
                 <td>{p.breed || "—"}</td>
-                <td>{p.sexBase}</td>
+                <td>{classifySex(p)}</td>
                 <AgeCell pig={p} />
                 <td>{p.pen || "—"}</td>
-                <td className="num">{p.currentWeightKg.toFixed(1)} kg</td>
+                <td className="num">{fmtWeight(p.currentWeightKg, unit)}</td>
                 <td>
                   <StatusBadge status={p.status} />
                 </td>
