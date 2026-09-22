@@ -50,14 +50,14 @@ function ageLabel(d: Date) {
 }
 
 function AgeCell({ pig }: { pig: PigRow }) {
-  if (pig.dob) return <td className="num">{ageLabel(pig.dob)}</td>;
+  if (pig.dob) return <td className="num hidden md:table-cell">{ageLabel(pig.dob)}</td>;
   if (pig.acquiredDate)
     return (
-      <td className="num" title="Approximate — based on acquired date, birth date unknown">
+      <td className="num hidden md:table-cell" title="Approximate — based on acquired date, birth date unknown">
         {ageLabel(pig.acquiredDate)}*
       </td>
     );
-  return <td className="num text-muted">—</td>;
+  return <td className="num hidden md:table-cell text-muted">—</td>;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -149,10 +149,10 @@ export function PigsTable({
             <tr>
               <th>Pig</th>
               <th>Tag</th>
-              <th>Breed</th>
-              <th>Sex</th>
-              <th className="num">Age</th>
-              <th>Pen</th>
+              <th className="hidden md:table-cell">Breed</th>
+              <th className="hidden md:table-cell">Sex</th>
+              <th className="num hidden md:table-cell">Age</th>
+              <th className="hidden md:table-cell">Pen</th>
               <th className="num">Weight</th>
               <th>Status</th>
               <th>Growth</th>
@@ -164,10 +164,10 @@ export function PigsTable({
               <tr key={p.id}>
                 <td className="font-semibold">{p.name}</td>
                 <td className="tag">{p.tag}</td>
-                <td>{p.breed || "—"}</td>
-                <td>{classifySex(p)}</td>
+                <td className="hidden md:table-cell">{p.breed || "—"}</td>
+                <td className="hidden md:table-cell">{classifySex(p)}</td>
                 <AgeCell pig={p} />
-                <td>{p.pen || "—"}</td>
+                <td className="hidden md:table-cell">{p.pen || "—"}</td>
                 <td className="num">{fmtWeight(p.currentWeightKg, unit)}</td>
                 <td>
                   <StatusBadge status={p.status} />

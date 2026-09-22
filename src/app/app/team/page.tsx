@@ -24,7 +24,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Add a team member</h2>
-        <form action={createTeamMemberAction} className="grid grid-cols-2 gap-3 items-end">
+        <form action={createTeamMemberAction} className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
           <div className="field">
             <label>Name</label>
             <input name="name" required placeholder="Sam Rivera" />
@@ -54,9 +54,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
       <div className="card divide-y divide-border">
         {members.map((m) => (
-          <div key={m.id} className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <div className="avatar-circle">
+          <div key={m.id} className="flex items-center justify-between gap-3 p-4 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="avatar-circle shrink-0">
                 {m.avatarUrl ? (
                   <img src={m.avatarUrl} alt="" />
                 ) : (
@@ -68,12 +68,12 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     .toUpperCase()
                 )}
               </div>
-              <div>
-                <div className="font-semibold text-sm">{m.name}</div>
-                <div className="text-xs text-muted">{m.email}</div>
+              <div className="min-w-0">
+                <div className="font-semibold text-sm truncate">{m.name}</div>
+                <div className="text-xs text-muted truncate">{m.email}</div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <span className={`badge ${m.role === "owner" ? "badge-info" : m.role === "manager" ? "badge-good" : "badge-muted"}`}>
                 {m.role}
               </span>

@@ -38,8 +38,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-bg">
+      {/* Off-canvas mobile nav, CSS-only (no JS beyond SidebarNav's own
+       * close-on-navigate): the checkbox is toggled by the topbar's
+       * hamburger <label> and by the backdrop's <label>, and Tailwind's
+       * peer-checked variant slides the sidebar in. Below md it starts
+       * hidden off-screen; at md and up it's always shown in normal flow
+       * and this checkbox has no effect. */}
+      <input type="checkbox" id="nav-toggle" className="peer/nav hidden" aria-hidden="true" />
       <IconSprite />
-      <aside className="w-[236px] shrink-0 bg-surface border-r border-border flex flex-col sticky top-0 h-screen p-3.5 gap-1">
+      <label
+        htmlFor="nav-toggle"
+        className="hidden peer-checked/nav:block fixed inset-0 bg-black/40 z-40 md:hidden"
+        aria-hidden="true"
+      />
+      <aside className="w-[236px] max-w-[82vw] shrink-0 bg-surface border-r border-border flex flex-col fixed md:sticky top-0 left-0 h-screen p-3.5 gap-1 z-50 overflow-y-auto -translate-x-full peer-checked/nav:translate-x-0 md:translate-x-0 transition-transform duration-200">
         <div id="sidebar-brand" className="flex items-center gap-2.5 px-2 pb-4">
           <Icon name="pig" className="w-6 h-6" />
           <div>
@@ -86,7 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </aside>
-      <main className="flex-1 min-w-0 px-8 pb-8 max-w-5xl mx-auto w-full">
+      <main className="flex-1 min-w-0 px-4 md:px-8 pb-8 max-w-5xl mx-auto w-full">
         <Topbar
           userName={user?.name ?? "Account"}
           userRole={session.role}

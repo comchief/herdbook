@@ -11,7 +11,7 @@ export default async function Home() {
   return (
     <div className="flex-1 bg-bg">
       <IconSprite />
-      <header className="flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
+      <header className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-5 max-w-5xl mx-auto">
         <div className="brand-mark">
           <Icon name="pig" />
           <span>Herdbook</span>

@@ -29,7 +29,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       <p className="text-ink-soft text-sm mb-6">Animals that have left the farm.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <div className="grid grid-cols-2 gap-3.5 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-6">
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="tag" />Revenue, year to date</div>
           <div className="v num">{fmtMoney(ytdRevenue, farm.currency)}</div>
@@ -42,7 +42,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Record a sale</h2>
-        <form action={createSaleAction} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+        <form action={createSaleAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div className="field">
             <label>Date</label>
             <input type="date" name="date" required />

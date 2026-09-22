@@ -94,7 +94,7 @@ export default async function BillingPage({
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">I&apos;ve made a transfer</h2>
-        <form action={submitPaymentAction} className="grid grid-cols-2 gap-3 items-end">
+        <form action={submitPaymentAction} className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
           <div className="field">
             <label>Payer name</label>
             <input name="payerName" required placeholder="As shown on the transfer" />

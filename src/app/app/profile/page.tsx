@@ -68,7 +68,7 @@ export default async function ProfilePage({
         </div>
       ))}
 
-      <div className="grid grid-cols-[1fr_260px] gap-3.5 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-3.5 items-start">
         <div className="space-y-3.5">
           <form action={updateProfileAction} className="card p-6 space-y-4">
             <h2 className="font-bold text-ink -mt-1 mb-1">Account details</h2>

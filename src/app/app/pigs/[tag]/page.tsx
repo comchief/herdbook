@@ -81,12 +81,12 @@ export default async function PigProfilePage({
 
   return (
     <div className="max-w-3xl">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-ink flex items-center gap-2">
-              <Icon name="pig" className="w-5 h-5 text-accent" />
-              {pig!.name}
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h1 className="text-2xl font-bold text-ink flex items-center gap-2 min-w-0">
+              <Icon name="pig" className="w-5 h-5 text-accent shrink-0" />
+              <span className="break-words">{pig!.name}</span>
             </h1>
             <span className={`badge badge-${s.cls}`}>
               <span className="badge-dot" />
@@ -127,7 +127,7 @@ export default async function PigProfilePage({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3.5 mb-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-3.5">
         <div className="card stat-tile p-[17px_18px]">
           <div className="k">
             <Icon name="scale" />
@@ -206,7 +206,7 @@ export default async function PigProfilePage({
 
       <div className="card p-5 mb-3.5">
         <h2 className="font-bold text-ink mb-3.5">Details</h2>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
           <div className="flex justify-between border-b border-border pb-2">
             <span className="text-muted">Breed</span>
             <span className="font-semibold">{pig!.breed || "—"}</span>

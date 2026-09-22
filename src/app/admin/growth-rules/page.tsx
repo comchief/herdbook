@@ -53,7 +53,7 @@ export default async function AdminGrowthRulesPage({
               </div>
               <p className="text-xs text-muted mb-4">{STAGE_HINT[key]}</p>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="field">
                   <label>Age from (weeks)</label>
                   <input type="number" step="0.1" min="0" name={`${key}_ageMinWeeks`} defaultValue={weeksValue(r.ageMinDays)} required />
@@ -65,7 +65,7 @@ export default async function AdminGrowthRulesPage({
               </div>
 
               <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">Weight at the start of this stage (lb)</div>
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="field">
                   <label>Minimum</label>
                   <input
@@ -93,7 +93,7 @@ export default async function AdminGrowthRulesPage({
               <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
                 Weight at the end of this stage (lb){key === "finisher" && " — market weight"}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="field">
                   <label>Minimum</label>
                   <input

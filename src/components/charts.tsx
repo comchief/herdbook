@@ -4,8 +4,12 @@
  * assigned in the validated fixed order below (never cycled), status colors
  * (good/warn/critical) are reserved for state and never reused as series
  * identity, and every multi-series chart carries a legend so identity never
- * rides on color alone. Native <title> elements give a lightweight hover
- * tooltip without any client-side JS.
+ * rides on color alone. A native `title` attribute on each point gives a
+ * lightweight hover tooltip without any client-side JS (an SVG `<title>`
+ * child element does the same visually, but React's SSR hoists/dedupes
+ * `<title>` tags as document-metadata resources, which emptied these out
+ * on the server and caused a hydration mismatch — the attribute form
+ * avoids that entirely).
  */
 
 // Validated categorical order (light-mode hexes) — see dataviz skill's
@@ -82,6 +86,13 @@ export function Donut({
                 const dashoffset = -offset;
                 offset += frac * circumference;
                 const color = s.color ?? categoricalColor(i);
+                // React's SVGProps typing has no `title` attribute (only the
+                // element form), but the DOM/browsers support it fine — see
+                // the file-header comment for why we use the attribute here.
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const titleAttr: any = {
+                  title: `${s.label}: ${fmt(s.value)} (${total > 0 ? Math.round((s.value / total) * 100) : 0}%)`,
+                };
                 return (
                   <circle
                     key={s.label}
@@ -94,11 +105,8 @@ export function Donut({
                     strokeDasharray={dasharray}
                     strokeDashoffset={dashoffset}
                     strokeLinecap={slices.filter((x) => x.value > 0).length === 1 ? "butt" : "round"}
-                  >
-                    <title>
-                      {s.label}: {fmt(s.value)} ({total > 0 ? Math.round((s.value / total) * 100) : 0}%)
-                    </title>
-                  </circle>
+                    {...titleAttr}
+                  />
                 );
               })
           )}
@@ -180,13 +188,22 @@ export function LineChart({
         <line x1={0} y1={height - padBottom} x2={width} y2={height - padBottom} stroke="var(--border)" strokeWidth={1} />
         <path d={area} fill={color} opacity={0.1} />
         <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        {coords.map((c, i) => (
-          <circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 4 : 3} fill={color} stroke="var(--surface)" strokeWidth={2}>
-            <title>
-              {c.label}: {fmt(c.value)}
-            </title>
-          </circle>
-        ))}
+        {coords.map((c, i) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const titleAttr: any = { title: `${c.label}: ${fmt(c.value)}` };
+          return (
+            <circle
+              key={i}
+              cx={c.x}
+              cy={c.y}
+              r={i === coords.length - 1 ? 4 : 3}
+              fill={color}
+              stroke="var(--surface)"
+              strokeWidth={2}
+              {...titleAttr}
+            />
+          );
+        })}
         <text x={Math.min(last.x, width - 46)} y={Math.max(last.y - 10, 12)} textAnchor="end" fontSize={12} fontWeight={700} fill="var(--ink)">
           {fmt(last.value)}
         </text>

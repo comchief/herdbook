@@ -35,7 +35,7 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
       <p className="text-ink-soft text-sm mb-6">Matings, gestation countdowns and farrowing outcomes.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <div className="grid grid-cols-3 gap-3.5 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-6">
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="heart" />Expecting</div>
           <div className="v num">{expecting.length}</div>
@@ -53,7 +53,7 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Log a breeding</h2>
-        <form action={createBreedingAction} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+        <form action={createBreedingAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div className="field">
             <label>Sow</label>
             <select name="sowTag" required>

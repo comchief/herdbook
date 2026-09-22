@@ -169,7 +169,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className={`grid ${isManager ? "grid-cols-4" : "grid-cols-3"} gap-3.5 mb-4`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isManager ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-3.5 mb-4`}>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="pig" />Total herd</div>
           <div className="v num">{pigs.length}</div>
@@ -198,7 +198,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className={`grid ${isManager ? "grid-cols-2" : "grid-cols-1"} gap-3.5 mb-3.5 items-stretch`}>
+      <div className={`grid grid-cols-1 ${isManager ? "lg:grid-cols-2" : ""} gap-3.5 mb-3.5 items-stretch`}>
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3.5">
             <h3 className="font-semibold text-[15.5px]">Herd weight trend</h3>
@@ -243,7 +243,7 @@ export default async function DashboardPage() {
       </div>
 
       {isManager && (
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3.5">
               <h3 className="font-semibold text-[15.5px]">Revenue vs. expenses</h3>

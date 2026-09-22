@@ -21,7 +21,7 @@ export default async function NewPigPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold text-ink mb-6 flex items-center gap-2"><Icon name="pig" className="w-5 h-5 text-accent" />Add a pig</h1>
       <form action={createPigAction} className="card p-6 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="field">
             <label>Ear tag</label>
             <input name="tag" required placeholder="PB-0231" />

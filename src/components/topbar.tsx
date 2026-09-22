@@ -35,49 +35,57 @@ export function Topbar({
 
   return (
     <div className="topbar">
-      <Link href="/app" className="topbar-icon-btn" aria-label={notifCount > 0 ? `${notifCount} items need attention` : "Notifications"}>
-        <Icon name="bell" />
-        {notifCount > 0 && <span className="dot" />}
-      </Link>
-      <details className="profile-menu">
-        <summary className="profile-trigger">
-          <div className="avatar-circle">{avatarUrl ? <img src={avatarUrl} alt="" /> : initials || "?"}</div>
-          <div>
-            <div className="profile-name">{userName}</div>
-            <div className="profile-role">{ROLE_LABEL[userRole] ?? userRole}</div>
+      {/* Opens the off-canvas sidebar defined in app/layout.tsx — plain
+       * checkbox + label, no JS. Hidden once the sidebar is always shown
+       * in normal flow (md and up). */}
+      <label htmlFor="nav-toggle" className="topbar-icon-btn md:hidden" aria-label="Open menu">
+        <Icon name="menu" />
+      </label>
+      <div className="flex items-center gap-2.5 ml-auto">
+        <Link href="/app" className="topbar-icon-btn" aria-label={notifCount > 0 ? `${notifCount} items need attention` : "Notifications"}>
+          <Icon name="bell" />
+          {notifCount > 0 && <span className="dot" />}
+        </Link>
+        <details className="profile-menu">
+          <summary className="profile-trigger">
+            <div className="avatar-circle">{avatarUrl ? <img src={avatarUrl} alt="" /> : initials || "?"}</div>
+            <div className="hidden sm:block">
+              <div className="profile-name">{userName}</div>
+              <div className="profile-role">{ROLE_LABEL[userRole] ?? userRole}</div>
+            </div>
+            <Icon name="chevron-down" className="chev hidden sm:block" />
+          </summary>
+          <div className="profile-dropdown">
+            <Link href="/app/profile">
+              <Icon name="user" />
+              Edit profile
+            </Link>
+            {isOwner && (
+              <>
+                <Link href="/app/settings">
+                  <Icon name="gear" />
+                  Farm settings
+                </Link>
+                <Link href="/app/team">
+                  <Icon name="users" />
+                  Team accounts
+                </Link>
+                <Link href="/app/billing">
+                  <Icon name="card" />
+                  Billing
+                </Link>
+              </>
+            )}
+            <hr />
+            <form action={logoutAction}>
+              <button type="submit">
+                <Icon name="logout" />
+                Log out
+              </button>
+            </form>
           </div>
-          <Icon name="chevron-down" className="chev" />
-        </summary>
-        <div className="profile-dropdown">
-          <Link href="/app/profile">
-            <Icon name="user" />
-            Edit profile
-          </Link>
-          {isOwner && (
-            <>
-              <Link href="/app/settings">
-                <Icon name="gear" />
-                Farm settings
-              </Link>
-              <Link href="/app/team">
-                <Icon name="users" />
-                Team accounts
-              </Link>
-              <Link href="/app/billing">
-                <Icon name="card" />
-                Billing
-              </Link>
-            </>
-          )}
-          <hr />
-          <form action={logoutAction}>
-            <button type="submit">
-              <Icon name="logout" />
-              Log out
-            </button>
-          </form>
-        </div>
-      </details>
+        </details>
+      </div>
     </div>
   );
 }

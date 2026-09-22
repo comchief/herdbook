@@ -29,7 +29,7 @@ export default async function MedicalPage({ searchParams }: { searchParams: Prom
       <p className="text-ink-soft text-sm mb-6">Vaccinations, treatments and check-ups across the herd.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <div className="grid grid-cols-3 gap-3.5 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-6">
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="alert" />Follow-ups due (14 days)</div>
           <div className="v num">{dueSoon}</div>
@@ -46,7 +46,7 @@ export default async function MedicalPage({ searchParams }: { searchParams: Prom
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Log a record</h2>
-        <form action={createMedicalAction} className="grid grid-cols-2 md:grid-cols-3 gap-3 items-end">
+        <form action={createMedicalAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 items-end">
           <div className="field">
             <label>Pig</label>
             <select name="pigTag" required>

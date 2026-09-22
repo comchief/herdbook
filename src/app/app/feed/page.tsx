@@ -87,7 +87,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
         {isManager && (
           <details className="mt-4">
             <summary className="btn btn-small cursor-pointer list-none inline-block">+ New ration</summary>
-            <form action={createRationAction} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end mt-3">
+            <form action={createRationAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end mt-3">
               <div className="field">
                 <label>Ration name</label>
                 <input name="feedType" required placeholder="Grower pellets" />

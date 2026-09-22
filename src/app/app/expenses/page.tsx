@@ -35,7 +35,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
       <p className="text-ink-soft text-sm mb-6">Purchases and operating costs for the farm.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="receipt" />Logged here, YTD</div>
           <div className="v num">{fmtMoney(ytdExpenses, farm.currency)}</div>
@@ -57,7 +57,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Log an expense</h2>
-        <form action={createExpenseAction} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+        <form action={createExpenseAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div className="field">
             <label>Date</label>
             <input type="date" name="date" required />
