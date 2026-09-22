@@ -110,6 +110,13 @@ export function IconSprite() {
         <circle cx="12" cy="8" r="3.6" />
         <path d="M4.5 20c1-4 4-6.2 7.5-6.2S18.5 16 19.5 20" />
       </symbol>
+      <symbol id="ic-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 17.5V6.5a2 2 0 0 0-2-2H3.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1H6" />
+        <path d="M14 9.5h3.6a1 1 0 0 1 .78.37l2.4 3a1 1 0 0 1 .22.63v3a1 1 0 0 1-1 1H19" />
+        <circle cx="7.5" cy="17.5" r="2" />
+        <circle cx="17" cy="17.5" r="2" />
+        <path d="M9.5 17.5h5.5" />
+      </symbol>
     </svg>
   );
 }

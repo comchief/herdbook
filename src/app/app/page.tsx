@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/auth";
+import { requireSession, currentUserRecord } from "@/lib/auth";
 import { requireActiveFarm } from "@/lib/gate";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
@@ -15,6 +15,11 @@ function fmtMoney(n: number, currency: string) {
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
+function greeting(hour: number) {
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 export default async function DashboardPage() {
   const session = await requireSession();
@@ -24,7 +29,7 @@ export default async function DashboardPage() {
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const unitLabel = weightUnitLabel(unit);
 
-  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs] = await Promise.all([
+  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs, user] = await Promise.all([
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, farmId)),
     db.select().from(schema.breedingRecords).where(eq(schema.breedingRecords.farmId, farmId)),
     db.select().from(schema.medicalRecords).where(eq(schema.medicalRecords.farmId, farmId)),
@@ -32,15 +37,23 @@ export default async function DashboardPage() {
     db.select().from(schema.sales).where(eq(schema.sales.farmId, farmId)),
     db.select().from(schema.expenses).where(eq(schema.expenses.farmId, farmId)),
     db.select().from(schema.feedLogs).where(eq(schema.feedLogs.farmId, farmId)),
+    currentUserRecord(session),
   ]);
+  const firstName = (user?.name ?? "there").split(" ")[0];
 
   const pregnant = breeding.filter((b) => !b.actualFarrowDate);
   const totalFeedKg = feedInventory.reduce((s, f) => s + f.stockKg, 0);
   const today = new Date();
   const ym = today.toISOString().slice(0, 7);
-  const revenueThisMonth = sales
-    .filter((s) => s.date.toISOString().slice(0, 7) === ym)
-    .reduce((s, sale) => s + sale.revenue, 0);
+  const salesThisMonth = sales.filter((s) => s.date.toISOString().slice(0, 7) === ym);
+  const revenueThisMonth = salesThisMonth.reduce((s, sale) => s + sale.revenue, 0);
+  const breedingStockCount = pigs.filter((p) => p.status === "breeding-sow" || p.status === "breeding-boar").length;
+  // "Ready for finishing" = grower/finisher pigs that have already reached their
+  // target market weight — a signal they're due to move on, not just a status label.
+  const readyForFinishing = pigs.filter(
+    (p) => ["grower", "finisher"].includes(p.status) && p.targetWeightKg != null && p.currentWeightKg >= p.targetWeightKg
+  ).length;
+  const rationsBelowReorder = feedInventory.filter((f) => f.stockKg < f.reorderLevelKg).length;
 
   type Task = { title: string; sub: string; cls: "critical" | "warn"; href: string };
   const tasks: Task[] = [];
@@ -102,28 +115,51 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
-        <p className="text-ink-soft text-sm">Here&apos;s how {farm.name} is doing today.</p>
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-ink">
+          {greeting(today.getHours())}, {firstName}
+        </h1>
+        <p className="text-ink-soft text-sm">Here&apos;s how the herd is doing at {farm.name} today.</p>
+      </div>
+
+      <div className="flex items-center gap-2.5 mb-6">
+        <a href="/app/export-summary" className="btn">
+          <Icon name="truck" className="w-4 h-4" />
+          Export summary
+        </a>
+        {isManager && (
+          <Link href="/app/pigs/new" className="btn btn-primary">
+            <Icon name="plus" className="w-3.5 h-3.5" />
+            Add pig
+          </Link>
+        )}
       </div>
 
       <div className={`grid ${isManager ? "grid-cols-4" : "grid-cols-3"} gap-3.5 mb-4`}>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="pig" />Total herd</div>
           <div className="v num">{pigs.length}</div>
+          <div className="d">
+            {readyForFinishing} ready for finishing · {breedingStockCount} breeding stock
+          </div>
         </div>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="heart" />Pregnant sows</div>
           <div className="v num">{pregnant.length}</div>
+          <div className="d">{pregnant.length === 0 ? "No active pregnancies" : `${pregnant.length} active ${pregnant.length === 1 ? "pregnancy" : "pregnancies"}`}</div>
         </div>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="wheat" />Feed on hand</div>
           <div className="v num">{fmtWeight(totalFeedKg, unit, 0)}</div>
+          <div className={`d${rationsBelowReorder > 0 ? " warn" : ""}`}>
+            {rationsBelowReorder === 0 ? "All rations stocked" : `${rationsBelowReorder} ${rationsBelowReorder === 1 ? "ration" : "rations"} below reorder point`}
+          </div>
         </div>
         {isManager && (
           <div className="card stat-tile p-[17px_18px]">
             <div className="k"><Icon name="tag" />Revenue, this month</div>
             <div className="v num">{fmtMoney(revenueThisMonth, farm.currency)}</div>
+            <div className="d">{salesThisMonth.length} {salesThisMonth.length === 1 ? "sale" : "sales"} this month</div>
           </div>
         )}
       </div>
