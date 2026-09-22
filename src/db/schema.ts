@@ -57,7 +57,9 @@ export const pigs = pgTable(
     name: text("name").notNull(),
     breed: text("breed"),
     sexBase: text("sex_base").notNull(),
-    dob: timestamp("dob").notNull(),
+    // Nullable: a pig can be tracked by acquiredDate alone when its birth
+    // date is unknown (e.g. purchased stock) — see acquiredDate below.
+    dob: timestamp("dob"),
     status: text("status").notNull(),
     pen: text("pen"),
     currentWeightKg: doublePrecision("current_weight_kg").notNull().default(0),

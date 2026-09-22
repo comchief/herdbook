@@ -44,7 +44,11 @@ export default async function NewPigPage() {
           </div>
           <div className="field">
             <label>Date of birth</label>
-            <input type="date" name="dob" required />
+            <input type="date" name="dob" />
+          </div>
+          <div className="field">
+            <label>Acquired date</label>
+            <input type="date" name="acquiredDate" defaultValue={new Date().toISOString().slice(0, 10)} />
           </div>
           <div className="field">
             <label>Status</label>
@@ -96,6 +100,7 @@ export default async function NewPigPage() {
             <input type="number" step="0.1" min="0" name="targetMonths" placeholder="6" />
           </div>
         </div>
+        <p className="text-xs text-muted -mt-2">Provide a date of birth, or — if it isn&apos;t known — an acquired date so the pig can still be tracked.</p>
         <div className="field">
           <label>Notes</label>
           <textarea name="notes" rows={3} placeholder="Temperament, markings, anything worth remembering…" />

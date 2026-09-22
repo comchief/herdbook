@@ -24,7 +24,8 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
   const boars = pigs.filter((p) => p.status === "breeding-boar" || p.tag === pig!.sireTag);
   const sows = pigs.filter((p) => p.status === "breeding-sow" || p.tag === pig!.damTag);
 
-  const dobStr = pig!.dob.toISOString().slice(0, 10);
+  const dobStr = pig!.dob ? pig!.dob.toISOString().slice(0, 10) : "";
+  const acquiredDateStr = pig!.acquiredDate ? pig!.acquiredDate.toISOString().slice(0, 10) : "";
 
   return (
     <div className="max-w-2xl">
@@ -57,7 +58,11 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
           </div>
           <div className="field">
             <label>Date of birth</label>
-            <input type="date" name="dob" defaultValue={dobStr} required />
+            <input type="date" name="dob" defaultValue={dobStr} />
+          </div>
+          <div className="field">
+            <label>Acquired date</label>
+            <input type="date" name="acquiredDate" defaultValue={acquiredDateStr} />
           </div>
           <div className="field">
             <label>Status</label>
@@ -109,6 +114,7 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
             <input type="number" step="0.1" min="0" name="targetMonths" defaultValue={pig!.targetMonths ?? ""} />
           </div>
         </div>
+        <p className="text-xs text-muted -mt-2">Provide a date of birth, or — if it isn&apos;t known — an acquired date so the pig can still be tracked.</p>
         <div className="field">
           <label>Notes</label>
           <textarea name="notes" rows={3} defaultValue={pig!.notes ?? ""} />

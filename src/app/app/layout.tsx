@@ -1,21 +1,24 @@
-import { requireSession } from "@/lib/auth";
+import { requireSession, currentUserRecord } from "@/lib/auth";
 import { loadFarm } from "@/lib/gate";
 import { subscriptionStatus, daysRemaining } from "@/lib/subscription";
 import { logoutAction } from "@/lib/actions/auth";
+import { needsAttentionCount } from "@/lib/needs-attention";
 import { db, schema } from "@/db";
 import { eq, count } from "drizzle-orm";
 import { IconSprite, Icon } from "@/components/icons";
 import { SidebarNav, type NavItem } from "@/components/sidebar-nav";
+import { Topbar } from "@/components/topbar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
   const farm = await loadFarm(session);
   const status = subscriptionStatus(farm);
 
-  const [{ pigCount }] = await db
-    .select({ pigCount: count() })
-    .from(schema.pigs)
-    .where(eq(schema.pigs.farmId, session.farmId));
+  const [[{ pigCount }], user, notifCount] = await Promise.all([
+    db.select({ pigCount: count() }).from(schema.pigs).where(eq(schema.pigs.farmId, session.farmId)),
+    currentUserRecord(session),
+    needsAttentionCount(session.farmId),
+  ]);
 
   const herdItems: NavItem[] = [
     { href: "/app/pigs", label: "Pig Registry", icon: "pig", count: pigCount },
@@ -83,7 +86,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </form>
         </div>
       </aside>
-      <main className="flex-1 min-w-0 p-8 max-w-5xl mx-auto w-full">{children}</main>
+      <main className="flex-1 min-w-0 px-8 pb-8 max-w-5xl mx-auto w-full">
+        <Topbar userName={user?.name ?? "Account"} userRole={session.role} notifCount={notifCount} isOwner={session.role === "owner"} />
+        {children}
+      </main>
     </div>
   );
 }

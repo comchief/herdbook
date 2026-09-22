@@ -45,7 +45,11 @@ export async function createPigAction(formData: FormData) {
   const tag = str(formData, "tag");
   const name = str(formData, "name");
   const dob = dateOrNull(formData, "dob");
-  if (!tag || !name || !dob) redirect("/app/pigs?error=" + encodeURIComponent("Ear tag, name and date of birth are required."));
+  const acquiredDate = dateOrNull(formData, "acquiredDate");
+  if (!tag || !name) redirect("/app/pigs?error=" + encodeURIComponent("Ear tag and name are required."));
+  if (!dob && !acquiredDate) {
+    redirect("/app/pigs?error=" + encodeURIComponent("Provide a date of birth, or an acquired date if the birth date is unknown."));
+  }
 
   const [clash] = await db
     .select()
@@ -61,7 +65,7 @@ export async function createPigAction(formData: FormData) {
     name,
     breed: str(formData, "breed") || null,
     sexBase: str(formData, "sexBase") || "Female",
-    dob: dob!,
+    dob: dob,
     status: str(formData, "status") || "piglet",
     pen: str(formData, "pen") || null,
     currentWeightKg: weight ?? 0,
@@ -70,7 +74,7 @@ export async function createPigAction(formData: FormData) {
     targetWeightKg: num(formData, "targetWeightKg"),
     targetMonths: num(formData, "targetMonths"),
     notes: str(formData, "notes") || null,
-    acquiredDate: new Date(),
+    acquiredDate: acquiredDate,
     weightLog: appendWeightLog([], weight),
   });
 
@@ -83,7 +87,11 @@ export async function updatePigAction(formData: FormData) {
   const originalTag = str(formData, "originalTag");
   const newTag = str(formData, "tag") || originalTag;
   const dob = dateOrNull(formData, "dob");
-  if (!originalTag || !newTag || !dob) redirect("/app/pigs?error=" + encodeURIComponent("Ear tag and date of birth are required."));
+  const acquiredDate = dateOrNull(formData, "acquiredDate");
+  if (!originalTag || !newTag) redirect("/app/pigs?error=" + encodeURIComponent("Ear tag is required."));
+  if (!dob && !acquiredDate) {
+    redirect("/app/pigs?error=" + encodeURIComponent("Provide a date of birth, or an acquired date if the birth date is unknown."));
+  }
 
   const [pig] = await db
     .select()
@@ -110,7 +118,8 @@ export async function updatePigAction(formData: FormData) {
       name: str(formData, "name") || pig!.name,
       breed: str(formData, "breed") || null,
       sexBase: str(formData, "sexBase") || pig!.sexBase,
-      dob: dob!,
+      dob: dob,
+      acquiredDate: acquiredDate,
       status: str(formData, "status") || pig!.status,
       pen: str(formData, "pen") || null,
       currentWeightKg: newWeight ?? pig!.currentWeightKg,
