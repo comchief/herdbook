@@ -41,6 +41,15 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     role: text("role").notNull().default("worker"), // "owner" | "manager" | "worker"
     isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
+    // Profile photo, stored as a data: URL (small images only — see the 2MB
+    // cap in updateAvatarAction) rather than an external object store, so
+    // the feature needs no file-hosting infrastructure of its own.
+    avatarUrl: text("avatar_url"),
+    // Set when the account holder submits the "Delete account" request on
+    // their profile page. Deletion is a manual follow-up (never automatic —
+    // for an owner it would take their whole farm's data with it), so this
+    // just timestamps the request for review; it's cleared if they cancel.
+    deletionRequestedAt: timestamp("deletion_requested_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email), index("users_farm_idx").on(t.farmId)]

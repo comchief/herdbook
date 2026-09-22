@@ -87,7 +87,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
       <main className="flex-1 min-w-0 px-8 pb-8 max-w-5xl mx-auto w-full">
-        <Topbar userName={user?.name ?? "Account"} userRole={session.role} notifCount={notifCount} isOwner={session.role === "owner"} />
+        <Topbar
+          userName={user?.name ?? "Account"}
+          userRole={session.role}
+          notifCount={notifCount}
+          isOwner={session.role === "owner"}
+          avatarUrl={user?.avatarUrl ?? null}
+        />
         {children}
       </main>
     </div>

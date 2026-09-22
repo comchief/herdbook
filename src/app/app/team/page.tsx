@@ -57,12 +57,16 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <div key={m.id} className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
               <div className="avatar-circle">
-                {m.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase()}
+                {m.avatarUrl ? (
+                  <img src={m.avatarUrl} alt="" />
+                ) : (
+                  m.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase()
+                )}
               </div>
               <div>
                 <div className="font-semibold text-sm">{m.name}</div>

@@ -17,11 +17,13 @@ export function Topbar({
   userRole,
   notifCount,
   isOwner,
+  avatarUrl,
 }: {
   userName: string;
   userRole: string;
   notifCount: number;
   isOwner: boolean;
+  avatarUrl?: string | null;
 }) {
   const initials = userName
     .split(" ")
@@ -39,7 +41,7 @@ export function Topbar({
       </Link>
       <details className="profile-menu">
         <summary className="profile-trigger">
-          <div className="avatar-circle">{initials || "?"}</div>
+          <div className="avatar-circle">{avatarUrl ? <img src={avatarUrl} alt="" /> : initials || "?"}</div>
           <div>
             <div className="profile-name">{userName}</div>
             <div className="profile-role">{ROLE_LABEL[userRole] ?? userRole}</div>
