@@ -8,6 +8,7 @@ import { Donut, LineChart, categoricalColor } from "@/components/charts";
 import { herdWeightTrend, herdComposition } from "@/lib/dashboard-charts";
 import { fmtDate } from "@/lib/format";
 import { kgToDisplay, weightUnitLabel, fmtWeight } from "@/lib/units";
+import { timeToMarket } from "@/lib/growth";
 
 function fmtMoney(n: number, currency: string) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
   ).length;
   const rationsBelowReorder = feedInventory.filter((f) => f.stockKg < f.reorderLevelKg).length;
 
-  type Task = { title: string; sub: string; cls: "critical" | "warn"; href: string };
+  type Task = { title: string; sub: string; badge: string; cls: "critical" | "warn"; href: string };
   const tasks: Task[] = [];
   for (const b of pregnant) {
     const d = daysBetween(today, b.expectedFarrowDate);
@@ -63,6 +64,7 @@ export default async function DashboardPage() {
       tasks.push({
         title: `${b.sowName ?? b.sowTag} due to farrow`,
         sub: `${d < 0 ? Math.abs(d) + " days overdue" : d === 0 ? "due today" : "in " + d + " days"} · ${fmtDate(b.expectedFarrowDate)}`,
+        badge: d < 0 ? "overdue" : "upcoming",
         cls: d <= 7 ? "critical" : "warn",
         href: "/app/breeding",
       });
@@ -75,8 +77,32 @@ export default async function DashboardPage() {
       tasks.push({
         title: `${m.pigName ?? m.pigTag} — ${m.type} follow-up`,
         sub: `${d < 0 ? Math.abs(d) + " days overdue" : d === 0 ? "due today" : "in " + d + " days"} · ${fmtDate(m.nextDueDate)}`,
+        badge: d < 0 ? "overdue" : "upcoming",
         cls: d < 0 ? "critical" : "warn",
         href: "/app/medical",
+      });
+    }
+  }
+  // Pigs falling behind (or past due) on their straight-line growth curve to
+  // market weight — same On track/Behind/Overdue classification as the
+  // pig profile's "Time to market" card, surfaced here so it's visible
+  // without opening every pig.
+  for (const p of pigs) {
+    const ttm = timeToMarket({
+      status: p.status,
+      dob: p.dob,
+      acquiredDate: p.acquiredDate,
+      currentWeightKg: p.currentWeightKg,
+      targetWeightKg: p.targetWeightKg,
+      targetMonths: p.targetMonths,
+    });
+    if (ttm && ttm.label !== "On track") {
+      tasks.push({
+        title: `${p.name} ${ttm.label === "Overdue" ? "overdue" : "behind"} on market weight`,
+        sub: `${fmtWeight(ttm.currentWeightKg, unit)} of ${fmtWeight(ttm.targetWeightKg, unit)} target (${ttm.weightPct}%)`,
+        badge: ttm.label,
+        cls: "critical",
+        href: `/app/pigs/${p.tag}`,
       });
     }
   }
@@ -85,7 +111,8 @@ export default async function DashboardPage() {
       tasks.push({
         title: `${f.feedType} below reorder point`,
         sub: `${fmtWeight(f.stockKg, unit, 0)} on hand · reorder at ${fmtWeight(f.reorderLevelKg, unit, 0)}`,
-        cls: "critical",
+        badge: "upcoming",
+        cls: "warn",
         href: "/app/feed",
       });
     }
@@ -184,7 +211,12 @@ export default async function DashboardPage() {
       </div>
 
       <div className="card p-5 mb-3.5">
-        <h2 className="font-bold text-ink mb-3">Needs attention</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-ink">Needs attention</h2>
+          {tasks.length > 0 && (
+            <span className="text-[11.5px] text-muted">{tasks.length} {tasks.length === 1 ? "item" : "items"}</span>
+          )}
+        </div>
         {tasks.length === 0 && <div className="text-sm text-muted py-6 text-center">Nothing needs attention right now.</div>}
         <div className="flex flex-col">
           {tasks.map((t, i) => (
@@ -197,7 +229,7 @@ export default async function DashboardPage() {
                 <div className="text-sm font-semibold">{t.title}</div>
                 <div className="text-xs text-muted">{t.sub}</div>
               </div>
-              <span className={`badge badge-${t.cls}`}>{t.cls === "critical" ? "overdue" : "upcoming"}</span>
+              <span className={`badge badge-${t.cls}`}>{t.badge}</span>
             </Link>
           ))}
         </div>
