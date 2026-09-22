@@ -1,6 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
 :root {
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --bg: #f4f7f4;
   --surface: #ffffff;
   --surface-2: #f1f5f1;
@@ -34,12 +38,104 @@
   --color-warn: var(--warn);
   --color-critical: var(--critical);
   --color-info: var(--info);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
 }
 
 body {
   background: var(--bg);
   color: var(--ink);
+  font-family: var(--font-body);
 }
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.1px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ---------- Sidebar ---------- */
+#sidebar-brand svg { color: var(--accent); }
+.navgroup-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  padding: 14px 10px 6px;
+}
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+.navitem svg { width: 18px; height: 18px; flex: none; }
+.navitem:hover { background: var(--surface-2); color: var(--ink); }
+.navitem.active { background: var(--accent); color: var(--accent-ink); }
+.navitem .count {
+  margin-left: auto;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: var(--surface-2);
+  padding: 1px 7px;
+  border-radius: 20px;
+  color: var(--ink-soft);
+}
+.navitem.active .count { background: rgba(0, 0, 0, 0.18); color: var(--accent-ink); }
+
+/* ---------- Stat tiles ---------- */
+.stat-tile .k {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--muted);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stat-tile .k svg { width: 13px; height: 13px; flex: none; }
+.stat-tile .v {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+.stat-tile .d { font-size: 12px; margin-top: 5px; color: var(--ink-soft); }
+
+/* ---------- Charts: donut ---------- */
+.donut-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.donut-legend { display: flex; flex-direction: column; gap: 9px; flex: 1; min-width: 150px; }
+.legend-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+.legend-row .sw { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.legend-row .lbl { flex: 1; color: var(--ink-soft); }
+.legend-row .val { font-weight: 700; font-family: var(--font-mono); }
+.donut-center-v { font-family: var(--font-display); font-weight: 700; }
+.donut-center-l { fill: var(--muted); }
+
+/* ---------- Charts: line ---------- */
+.linechart-foot { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 2px; padding: 0 2px; }
+.linechart-empty { padding: 30px 4px; text-align: center; color: var(--muted); font-size: 13px; }
+
+/* ---------- Feed gauges ---------- */
+.feed-gauge { display: flex; flex-direction: column; gap: 6px; padding: 14px 0; border-top: 1px solid var(--border); }
+.feed-gauge:first-child { border-top: none; padding-top: 0; }
+.feed-gauge .fg-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
+.feed-gauge .fg-head b { font-weight: 700; }
+.feed-gauge .fg-head span { font-size: 11.5px; color: var(--muted); }
+.fg-bar { height: 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+.fg-bar > i { display: block; height: 100%; border-radius: 6px; background: var(--good); }
+.fg-bar > i.warn { background: var(--warn); }
+.fg-bar > i.critical { background: var(--critical); }
 
 .card {
   background: var(--surface);
@@ -113,3 +209,18 @@ table.data thead th {
 }
 table.data tbody td { padding: 10px 12px; border-top: 1px solid var(--border); vertical-align: middle; }
 table.data tbody tr:hover { background: var(--surface-2); }
+table.data th.num, table.data td.num { text-align: right; }
+table.data td.tag { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+
+/* ---------- Auth / marketing brand mark ---------- */
+.brand-mark { display: flex; align-items: center; justify-content: center; gap: 9px; }
+.brand-mark svg { width: 26px; height: 26px; color: var(--accent); flex: none; }
+.brand-mark span { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--ink); }
+
+/* ---------- Avatars (team accounts) ---------- */
+.avatar-circle {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--accent-soft); color: #0f6b34;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 13px; flex: none;
+}

@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { subscriptionStatus, daysRemaining, MONTHLY_PRICE_USD } from "@/lib/subscription";
 import { submitPaymentAction } from "@/lib/actions/payments";
+import { Icon } from "@/components/icons";
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -64,7 +65,7 @@ export default async function BillingPage({
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
       <div className="card p-5 mb-6">
-        <h2 className="font-bold mb-3">Where to send payment</h2>
+        <h2 className="font-bold mb-3 flex items-center gap-2"><Icon name="card" className="w-4 h-4 text-muted" />Where to send payment</h2>
         {bank && bank.bankName ? (
           <div className="text-sm space-y-1 text-ink-soft">
             <div>

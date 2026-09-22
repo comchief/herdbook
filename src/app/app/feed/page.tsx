@@ -9,6 +9,7 @@ import {
   deleteFeedLogAction,
   assignPenFeedAction,
 } from "@/lib/actions/feed";
+import { Gauge } from "@/components/charts";
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -41,40 +42,46 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Inventory on hand</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {inventory.map((f) => (
-            <div key={f.id} className="border border-border rounded-xl p-3 flex items-center justify-between">
-              <div>
-                <div className="font-semibold text-sm">{f.feedType}</div>
-                <div className={`text-xs ${f.stockKg < f.reorderLevelKg ? "text-critical font-semibold" : "text-muted"}`}>
-                  {f.stockKg.toFixed(0)} kg on hand · reorder at {f.reorderLevelKg.toFixed(0)} kg
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+          {inventory.map((f) => {
+            const ceiling = Math.max(f.reorderLevelKg * 2.5, f.stockKg, 1);
+            const tone = f.stockKg < f.reorderLevelKg ? "critical" : f.stockKg < f.reorderLevelKg * 1.5 ? "warn" : "good";
+            return (
+              <div key={f.id} className="flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <Gauge
+                    label={f.feedType}
+                    sub={`${f.stockKg.toFixed(0)} kg · reorder at ${f.reorderLevelKg.toFixed(0)} kg`}
+                    fraction={f.stockKg / ceiling}
+                    tone={tone}
+                  />
                 </div>
+                {isManager && (
+                  <details className="relative mt-3.5 shrink-0">
+                    <summary className="btn btn-small cursor-pointer list-none">Edit</summary>
+                    <form action={updateRationAction} className="card p-4 absolute right-0 z-10 w-60 mt-2 space-y-2 text-left">
+                      <input type="hidden" name="id" value={f.id} />
+                      <div className="field">
+                        <label>Stock (kg)</label>
+                        <input type="number" step="1" name="stockKg" defaultValue={f.stockKg} />
+                      </div>
+                      <div className="field">
+                        <label>Reorder at (kg)</label>
+                        <input type="number" step="1" name="reorderLevelKg" defaultValue={f.reorderLevelKg} />
+                      </div>
+                      <div className="field">
+                        <label>Cost / kg</label>
+                        <input type="number" step="0.01" name="costPerKg" defaultValue={f.costPerKg} />
+                      </div>
+                      <button type="submit" className="btn btn-primary btn-small w-full justify-center">
+                        Save
+                      </button>
+                    </form>
+                  </details>
+                )}
               </div>
-              {isManager && (
-                <details className="relative">
-                  <summary className="btn btn-small cursor-pointer list-none">Edit</summary>
-                  <form action={updateRationAction} className="card p-4 absolute right-0 z-10 w-60 mt-2 space-y-2 text-left">
-                    <input type="hidden" name="id" value={f.id} />
-                    <div className="field">
-                      <label>Stock (kg)</label>
-                      <input type="number" step="1" name="stockKg" defaultValue={f.stockKg} />
-                    </div>
-                    <div className="field">
-                      <label>Reorder at (kg)</label>
-                      <input type="number" step="1" name="reorderLevelKg" defaultValue={f.reorderLevelKg} />
-                    </div>
-                    <div className="field">
-                      <label>Cost / kg</label>
-                      <input type="number" step="0.01" name="costPerKg" defaultValue={f.costPerKg} />
-                    </div>
-                    <button type="submit" className="btn btn-primary btn-small w-full justify-center">
-                      Save
-                    </button>
-                  </form>
-                </details>
-              )}
-            </div>
-          ))}
+            );
+          })}
           {inventory.length === 0 && <div className="text-sm text-muted">No rations yet.</div>}
         </div>
         {isManager && (
@@ -115,9 +122,9 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
             <thead>
               <tr>
                 <th>Pen</th>
-                <th>Pigs on plan</th>
+                <th className="num">Pigs on plan</th>
                 <th>Ration(s)</th>
-                <th>Daily total</th>
+                <th className="num">Daily total</th>
                 {isManager && <th></th>}
               </tr>
             </thead>
@@ -129,11 +136,11 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                 return (
                   <tr key={penName}>
                     <td className="font-semibold">{penName}</td>
-                    <td>
+                    <td className="num">
                       {onPlan.length} / {penPigs.length}
                     </td>
                     <td>{rationNames.length === 0 ? "—" : rationNames.length === 1 ? rationNames[0] : "Mixed"}</td>
-                    <td>{dailyKg.toFixed(1)} kg</td>
+                    <td className="num">{dailyKg.toFixed(1)} kg</td>
                     {isManager && (
                       <td className="text-right">
                         <details className="relative inline-block">
@@ -233,8 +240,8 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                   <th>Date</th>
                   <th>Ration</th>
                   <th>Movement</th>
-                  <th>Quantity</th>
-                  <th>Cost</th>
+                  <th className="num">Quantity</th>
+                  <th className="num">Cost</th>
                   <th></th>
                 </tr>
               </thead>
@@ -246,8 +253,8 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                     <td>
                       <span className={`badge ${l.direction === "purchase" ? "badge-good" : "badge-muted"}`}>{l.direction}</span>
                     </td>
-                    <td>{l.quantityKg.toFixed(0)} kg</td>
-                    <td>{l.costTotal ? `$${l.costTotal.toFixed(2)}` : "—"}</td>
+                    <td className="num">{l.quantityKg.toFixed(0)} kg</td>
+                    <td className="num">{l.costTotal ? `$${l.costTotal.toFixed(2)}` : "—"}</td>
                     <td className="text-right">
                       <form action={deleteFeedLogAction} className="inline">
                         <input type="hidden" name="id" value={l.id} />

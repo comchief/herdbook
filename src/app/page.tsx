@@ -2,6 +2,7 @@ import Link from "next/link";
 import { readSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { MONTHLY_PRICE_USD, TRIAL_DAYS } from "@/lib/subscription";
+import { IconSprite, Icon } from "@/components/icons";
 
 export default async function Home() {
   const session = await readSession();
@@ -9,8 +10,12 @@ export default async function Home() {
 
   return (
     <div className="flex-1 bg-bg">
+      <IconSprite />
       <header className="flex items-center justify-between px-6 py-5 max-w-5xl mx-auto">
-        <div className="font-bold text-lg tracking-tight text-ink">🐖 Herdbook</div>
+        <div className="brand-mark">
+          <Icon name="pig" />
+          <span>Herdbook</span>
+        </div>
         <nav className="flex gap-3">
           <Link href="/login" className="btn">Log in</Link>
           <Link href="/signup" className="btn btn-primary">Start free trial</Link>

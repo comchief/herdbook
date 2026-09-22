@@ -1,6 +1,7 @@
 import { requireOwner } from "@/lib/auth";
 import { requireActiveFarm } from "@/lib/gate";
 import { updateFarmSettingsAction } from "@/lib/actions/settings";
+import { Icon } from "@/components/icons";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
   const session = await requireOwner();
@@ -9,7 +10,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="max-w-md">
-      <h1 className="text-2xl font-bold text-ink mb-6">Farm settings</h1>
+      <h1 className="text-2xl font-bold text-ink mb-6 flex items-center gap-2"><Icon name="gear" className="w-5 h-5 text-accent" />Farm settings</h1>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
       {saved && <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">Settings saved.</div>}
       <form action={updateFarmSettingsAction} className="card p-6 space-y-4">

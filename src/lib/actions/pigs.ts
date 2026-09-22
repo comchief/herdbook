@@ -27,6 +27,19 @@ function dateOrNull(fd: FormData, key: string): Date | null {
   return v ? new Date(v) : null;
 }
 
+type WeightLogEntry = { date: string; weightKg: number };
+
+/** Appends a weigh-in to a pig's history (used to drive the dashboard's herd
+ * weight trend chart), keeping only the most recent 36 entries. */
+function appendWeightLog(existing: unknown, weightKg: number | null): WeightLogEntry[] {
+  const log: WeightLogEntry[] = Array.isArray(existing) ? (existing as WeightLogEntry[]) : [];
+  if (weightKg === null || weightKg <= 0) return log;
+  const today = new Date().toISOString().slice(0, 10);
+  const last = log[log.length - 1];
+  const next = last && last.date === today ? [...log.slice(0, -1), { date: today, weightKg }] : [...log, { date: today, weightKg }];
+  return next.slice(-36);
+}
+
 export async function createPigAction(formData: FormData) {
   const session = await requireManagerSession();
   const tag = str(formData, "tag");
@@ -41,6 +54,7 @@ export async function createPigAction(formData: FormData) {
     .limit(1);
   if (clash) redirect("/app/pigs?error=" + encodeURIComponent("That ear tag is already in use."));
 
+  const weight = num(formData, "weight");
   await db.insert(schema.pigs).values({
     farmId: session.farmId,
     tag,
@@ -50,13 +64,14 @@ export async function createPigAction(formData: FormData) {
     dob: dob!,
     status: str(formData, "status") || "piglet",
     pen: str(formData, "pen") || null,
-    currentWeightKg: num(formData, "weight") ?? 0,
+    currentWeightKg: weight ?? 0,
     sireTag: str(formData, "sireTag") || null,
     damTag: str(formData, "damTag") || null,
     targetWeightKg: num(formData, "targetWeightKg"),
     targetMonths: num(formData, "targetMonths"),
     notes: str(formData, "notes") || null,
     acquiredDate: new Date(),
+    weightLog: appendWeightLog([], weight),
   });
 
   revalidatePath("/app/pigs");
@@ -86,6 +101,8 @@ export async function updatePigAction(formData: FormData) {
     if (clash) redirect("/app/pigs?error=" + encodeURIComponent("That ear tag is already in use."));
   }
 
+  const newWeight = num(formData, "weight");
+  const weightChanged = newWeight !== null && newWeight !== pig!.currentWeightKg;
   await db
     .update(schema.pigs)
     .set({
@@ -96,13 +113,14 @@ export async function updatePigAction(formData: FormData) {
       dob: dob!,
       status: str(formData, "status") || pig!.status,
       pen: str(formData, "pen") || null,
-      currentWeightKg: num(formData, "weight") ?? pig!.currentWeightKg,
+      currentWeightKg: newWeight ?? pig!.currentWeightKg,
       sireTag: str(formData, "sireTag") || null,
       damTag: str(formData, "damTag") || null,
       targetWeightKg: num(formData, "targetWeightKg"),
       targetMonths: num(formData, "targetMonths"),
       notes: str(formData, "notes") || null,
       updatedAt: new Date(),
+      ...(weightChanged ? { weightLog: appendWeightLog(pig!.weightLog, newWeight) } : {}),
     })
     .where(eq(schema.pigs.id, pig!.id));
 

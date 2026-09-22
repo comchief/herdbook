@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { loginAction } from "@/lib/actions/auth";
+import { IconSprite, Icon } from "@/components/icons";
 
 export default async function LoginPage({
   searchParams,
@@ -9,9 +10,13 @@ export default async function LoginPage({
   const { error } = await searchParams;
   return (
     <div className="flex-1 flex items-center justify-center bg-bg px-4 py-10">
+      <IconSprite />
       <div className="card p-8 w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="font-bold text-lg mb-1">🐖 Herdbook</div>
+          <div className="brand-mark mb-3">
+            <Icon name="pig" />
+            <span>Herdbook</span>
+          </div>
           <h1 className="text-xl font-bold text-ink">Log in</h1>
         </div>
         {error && (

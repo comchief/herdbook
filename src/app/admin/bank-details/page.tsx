@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { updateBankDetailsAction } from "@/lib/actions/payments";
+import { Icon } from "@/components/icons";
 
 export default async function AdminBankDetailsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   const { saved } = await searchParams;
@@ -7,7 +8,7 @@ export default async function AdminBankDetailsPage({ searchParams }: { searchPar
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-bold text-ink mb-1">Bank details</h1>
+      <h1 className="text-2xl font-bold text-ink mb-1 flex items-center gap-2"><Icon name="card" className="w-5 h-5 text-accent" />Bank details</h1>
       <p className="text-ink-soft text-sm mb-6">Shown to every farm on their Billing page.</p>
       {saved && <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">Saved.</div>}
       <form action={updateBankDetailsAction} className="card p-6 space-y-4">

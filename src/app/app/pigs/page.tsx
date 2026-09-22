@@ -47,9 +47,9 @@ export default async function PigsPage({ searchParams }: { searchParams: Promise
               <th>Tag</th>
               <th>Breed</th>
               <th>Sex</th>
-              <th>Age</th>
+              <th className="num">Age</th>
               <th>Pen</th>
-              <th>Weight</th>
+              <th className="num">Weight</th>
               <th>Status</th>
               {isManager && <th></th>}
             </tr>
@@ -58,12 +58,12 @@ export default async function PigsPage({ searchParams }: { searchParams: Promise
             {pigs.map((p) => (
               <tr key={p.id}>
                 <td className="font-semibold">{p.name}</td>
-                <td className="font-mono text-xs text-ink-soft">{p.tag}</td>
+                <td className="tag">{p.tag}</td>
                 <td>{p.breed || "—"}</td>
                 <td>{p.sexBase}</td>
-                <td>{ageLabel(p.dob)}</td>
+                <td className="num">{ageLabel(p.dob)}</td>
                 <td>{p.pen || "—"}</td>
-                <td>{p.currentWeightKg.toFixed(1)} kg</td>
+                <td className="num">{p.currentWeightKg.toFixed(1)} kg</td>
                 <td>
                   <span className="badge badge-muted">{p.status}</span>
                 </td>

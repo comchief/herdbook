@@ -3,6 +3,7 @@ import { requireActiveFarm } from "@/lib/gate";
 import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createBreedingAction, logFarrowOutcomeAction, deleteBreedingAction } from "@/lib/actions/breeding";
+import { Icon } from "@/components/icons";
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -21,11 +22,34 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
   const sows = pigs.filter((p) => p.status === "breeding-sow" || (p.sexBase === "Female" && ["grower", "finisher"].includes(p.status)));
   const boars = pigs.filter((p) => p.status === "breeding-boar");
 
+  const today = new Date();
+  const yr = today.getFullYear().toString();
+  const expecting = records.filter((b) => !b.actualFarrowDate);
+  const dueSoon = expecting.filter((b) => Math.round((b.expectedFarrowDate.getTime() - today.getTime()) / 86400000) <= 30).length;
+  const farrowedYtd = records.filter((b) => b.actualFarrowDate && b.actualFarrowDate.getFullYear().toString() === yr);
+  const pigletsYtd = farrowedYtd.reduce((s, b) => s + (b.litterSize ?? 0), 0);
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-ink mb-1">Breeding &amp; pregnancy</h1>
       <p className="text-ink-soft text-sm mb-6">Matings, gestation countdowns and farrowing outcomes.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
+
+      <div className="grid grid-cols-3 gap-3.5 mb-6">
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="heart" />Expecting</div>
+          <div className="v num">{expecting.length}</div>
+        </div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="alert" />Due within 30 days</div>
+          <div className="v num">{dueSoon}</div>
+        </div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="pig" />Piglets born, YTD</div>
+          <div className="v num">{pigletsYtd}</div>
+          <div className="d">from {farrowedYtd.length} litter{farrowedYtd.length === 1 ? "" : "s"}</div>
+        </div>
+      </div>
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Log a breeding</h2>

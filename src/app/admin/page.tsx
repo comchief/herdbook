@@ -1,6 +1,7 @@
 import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { approvePaymentAction, rejectPaymentAction } from "@/lib/actions/payments";
+import { Icon } from "@/components/icons";
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -45,7 +46,7 @@ export default async function AdminPaymentsPage() {
         {pending.map((p) => (
           <div key={p.id} className="card p-5">
             <div className="flex items-center justify-between mb-2">
-              <div className="font-bold">{p.farmName}</div>
+              <div className="font-bold flex items-center gap-2"><Icon name="receipt" className="w-4 h-4 text-muted" />{p.farmName}</div>
               <span className="badge badge-warn">pending</span>
             </div>
             <div className="text-sm text-ink-soft space-y-0.5 mb-3">

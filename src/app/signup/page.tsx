@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signupAction } from "@/lib/actions/auth";
 import { TRIAL_DAYS } from "@/lib/subscription";
+import { IconSprite, Icon } from "@/components/icons";
 
 export default async function SignupPage({
   searchParams,
@@ -10,9 +11,13 @@ export default async function SignupPage({
   const { error } = await searchParams;
   return (
     <div className="flex-1 flex items-center justify-center bg-bg px-4 py-10">
+      <IconSprite />
       <div className="card p-8 w-full max-w-md">
         <div className="mb-6 text-center">
-          <div className="font-bold text-lg mb-1">🐖 Herdbook</div>
+          <div className="brand-mark mb-3">
+            <Icon name="pig" />
+            <span>Herdbook</span>
+          </div>
           <h1 className="text-xl font-bold text-ink">Set up your farm</h1>
           <p className="text-sm text-ink-soft mt-1">
             {TRIAL_DAYS} days free, then $30/month. No card needed today.

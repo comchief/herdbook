@@ -1,8 +1,11 @@
 import { requireSession } from "@/lib/auth";
 import { requireActiveFarm } from "@/lib/gate";
 import { db, schema } from "@/db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Link from "next/link";
+import { Icon } from "@/components/icons";
+import { Donut, LineChart, categoricalColor } from "@/components/charts";
+import { herdWeightTrend, herdComposition } from "@/lib/dashboard-charts";
 
 function fmtMoney(n: number, currency: string) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -20,12 +23,14 @@ export default async function DashboardPage() {
   const isManager = session.role !== "worker";
   const farmId = session.farmId;
 
-  const [pigs, breeding, medical, feedInventory, sales] = await Promise.all([
+  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs] = await Promise.all([
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, farmId)),
     db.select().from(schema.breedingRecords).where(eq(schema.breedingRecords.farmId, farmId)),
-    db.select().from(schema.medicalRecords).where(and(eq(schema.medicalRecords.farmId, farmId), isNotNull(schema.medicalRecords.nextDueDate))),
+    db.select().from(schema.medicalRecords).where(eq(schema.medicalRecords.farmId, farmId)),
     db.select().from(schema.feedInventory).where(eq(schema.feedInventory.farmId, farmId)),
     db.select().from(schema.sales).where(eq(schema.sales.farmId, farmId)),
+    db.select().from(schema.expenses).where(eq(schema.expenses.farmId, farmId)),
+    db.select().from(schema.feedLogs).where(eq(schema.feedLogs.farmId, farmId)),
   ]);
 
   const pregnant = breeding.filter((b) => !b.actualFarrowDate);
@@ -72,6 +77,28 @@ export default async function DashboardPage() {
     }
   }
 
+  const weightTrend = herdWeightTrend(pigs);
+  const composition = herdComposition(pigs);
+
+  const yr = today.getFullYear().toString();
+  const ytdExpenses = expenses.filter((e) => e.date.getFullYear().toString() === yr).reduce((s, e) => s + e.amount, 0);
+  const ytdFeedCost = feedLogs
+    .filter((l) => l.direction === "purchase" && l.date.getFullYear().toString() === yr)
+    .reduce((s, l) => s + l.costTotal, 0);
+  const ytdVetCost = medical.filter((m) => m.date.getFullYear().toString() === yr).reduce((s, m) => s + m.cost, 0);
+  const ytdRevenue = sales.filter((s) => s.date.getFullYear().toString() === yr).reduce((s, x) => s + x.revenue, 0);
+  const allCosts = ytdExpenses + ytdFeedCost + ytdVetCost;
+
+  const expenseByCategory = new Map<string, number>();
+  for (const e of expenses.filter((e) => e.date.getFullYear().toString() === yr)) {
+    expenseByCategory.set(e.category, (expenseByCategory.get(e.category) ?? 0) + e.amount);
+  }
+  if (ytdFeedCost > 0) expenseByCategory.set("feed", (expenseByCategory.get("feed") ?? 0) + ytdFeedCost);
+  if (ytdVetCost > 0) expenseByCategory.set("vet", (expenseByCategory.get("vet") ?? 0) + ytdVetCost);
+  const expenseSlices = [...expenseByCategory.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value]) => ({ label: label[0].toUpperCase() + label.slice(1), value }));
+
   return (
     <div>
       <div className="mb-6">
@@ -79,28 +106,47 @@ export default async function DashboardPage() {
         <p className="text-ink-soft text-sm">Here&apos;s how {farm.name} is doing today.</p>
       </div>
 
-      <div className={`grid ${isManager ? "grid-cols-4" : "grid-cols-3"} gap-4 mb-6`}>
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Total herd</div>
-          <div className="text-2xl font-bold">{pigs.length}</div>
+      <div className={`grid ${isManager ? "grid-cols-4" : "grid-cols-3"} gap-3.5 mb-4`}>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="pig" />Total herd</div>
+          <div className="v num">{pigs.length}</div>
         </div>
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Pregnant sows</div>
-          <div className="text-2xl font-bold">{pregnant.length}</div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="heart" />Pregnant sows</div>
+          <div className="v num">{pregnant.length}</div>
         </div>
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Feed on hand</div>
-          <div className="text-2xl font-bold">{totalFeedKg.toFixed(0)} kg</div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="wheat" />Feed on hand</div>
+          <div className="v num">{totalFeedKg.toFixed(0)} kg</div>
         </div>
         {isManager && (
-          <div className="card p-4">
-            <div className="text-xs font-bold uppercase text-muted mb-1">Revenue, this month</div>
-            <div className="text-2xl font-bold">{fmtMoney(revenueThisMonth, farm.currency)}</div>
+          <div className="card stat-tile p-[17px_18px]">
+            <div className="k"><Icon name="tag" />Revenue, this month</div>
+            <div className="v num">{fmtMoney(revenueThisMonth, farm.currency)}</div>
           </div>
         )}
       </div>
 
-      <div className="card p-5">
+      <div className={`grid ${isManager ? "grid-cols-2" : "grid-cols-1"} gap-3.5 mb-3.5 items-stretch`}>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3.5">
+            <h3 className="font-semibold text-[15.5px]">Herd weight trend</h3>
+            <span className="text-[11.5px] text-muted">recorded biomass, by month</span>
+          </div>
+          <LineChart points={weightTrend} valueFormat={(n) => `${n.toLocaleString()} kg`} />
+        </div>
+        {isManager && (
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3.5">
+              <h3 className="font-semibold text-[15.5px]">Herd composition</h3>
+              <span className="text-[11.5px] text-muted num">{pigs.length} pigs</span>
+            </div>
+            <Donut slices={composition} centerLabel={String(pigs.length)} centerSub="pigs" />
+          </div>
+        )}
+      </div>
+
+      <div className="card p-5 mb-3.5">
         <h2 className="font-bold text-ink mb-3">Needs attention</h2>
         {tasks.length === 0 && <div className="text-sm text-muted py-6 text-center">Nothing needs attention right now.</div>}
         <div className="flex flex-col">
@@ -119,6 +165,38 @@ export default async function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {isManager && (
+        <div className="grid grid-cols-2 gap-3.5">
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3.5">
+              <h3 className="font-semibold text-[15.5px]">Revenue vs. expenses</h3>
+              <span className="text-[11.5px] text-muted">year to date</span>
+            </div>
+            <Donut
+              slices={[
+                { label: "Revenue", value: ytdRevenue, color: categoricalColor(0) },
+                { label: "Expenses", value: allCosts, color: categoricalColor(1) },
+              ]}
+              centerLabel={fmtMoney(ytdRevenue - allCosts, farm.currency)}
+              centerSub={ytdRevenue - allCosts >= 0 ? "profit" : "loss"}
+              valueFormat={(n) => fmtMoney(n, farm.currency)}
+            />
+          </div>
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3.5">
+              <h3 className="font-semibold text-[15.5px]">Where the money goes</h3>
+              <span className="text-[11.5px] text-muted">expenses by category, YTD</span>
+            </div>
+            <Donut
+              slices={expenseSlices}
+              centerLabel={fmtMoney(allCosts, farm.currency)}
+              centerSub="total"
+              valueFormat={(n) => fmtMoney(n, farm.currency)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

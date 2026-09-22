@@ -3,6 +3,7 @@ import { requireActiveFarm } from "@/lib/gate";
 import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createSaleAction, deleteSaleAction } from "@/lib/actions/sales";
+import { Icon } from "@/components/icons";
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -30,14 +31,14 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       <p className="text-ink-soft text-sm mb-6">Animals that have left the farm.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Revenue, year to date</div>
-          <div className="text-2xl font-bold">{fmtMoney(ytdRevenue, farm.currency)}</div>
+      <div className="grid grid-cols-2 gap-3.5 mb-6">
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="tag" />Revenue, year to date</div>
+          <div className="v num">{fmtMoney(ytdRevenue, farm.currency)}</div>
         </div>
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Head sold, YTD</div>
-          <div className="text-2xl font-bold">{sales.filter((s) => s.date.getFullYear().toString() === yr).length}</div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="pig" />Head sold, YTD</div>
+          <div className="v num">{sales.filter((s) => s.date.getFullYear().toString() === yr).length}</div>
         </div>
       </div>
 
@@ -98,7 +99,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
               <th>Pig</th>
               <th>Channel</th>
               <th>Buyer</th>
-              <th>Revenue</th>
+              <th className="num">Revenue</th>
               <th></th>
             </tr>
           </thead>
@@ -106,12 +107,12 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
             {sales.map((s) => (
               <tr key={s.id}>
                 <td>{fmtDate(s.date)}</td>
-                <td className="font-mono text-xs">{s.pigTag || "—"}</td>
+                <td className="tag">{s.pigTag || "—"}</td>
                 <td>
                   <span className="badge badge-muted">{s.channel}</span>
                 </td>
                 <td>{s.buyer || "—"}</td>
-                <td className="font-semibold">{fmtMoney(s.revenue, farm.currency)}</td>
+                <td className="font-semibold num">{fmtMoney(s.revenue, farm.currency)}</td>
                 <td className="text-right">
                   <form action={deleteSaleAction} className="inline">
                     <input type="hidden" name="id" value={s.id} />

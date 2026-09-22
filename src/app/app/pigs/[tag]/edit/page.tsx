@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { updatePigAction } from "@/lib/actions/pigs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Icon } from "@/components/icons";
 
 export default async function EditPigPage({ params }: { params: Promise<{ tag: string }> }) {
   const session = await requireManager();
@@ -27,7 +28,7 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-ink mb-6">Edit {pig!.name}</h1>
+      <h1 className="text-2xl font-bold text-ink mb-6 flex items-center gap-2"><Icon name="pig" className="w-5 h-5 text-accent" />Edit {pig!.name}</h1>
       <form action={updatePigAction} className="card p-6 space-y-4">
         <input type="hidden" name="originalTag" value={pig!.tag} />
         <div className="grid grid-cols-2 gap-4">

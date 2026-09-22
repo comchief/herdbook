@@ -3,6 +3,7 @@ import { requireActiveFarm } from "@/lib/gate";
 import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createExpenseAction, deleteExpenseAction } from "@/lib/actions/expenses";
+import { Icon } from "@/components/icons";
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -39,23 +40,23 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
       <p className="text-ink-soft text-sm mb-6">Purchases and operating costs for the farm.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Logged here, YTD</div>
-          <div className="text-xl font-bold">{fmtMoney(ytdExpenses, farm.currency)}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="receipt" />Logged here, YTD</div>
+          <div className="v num">{fmtMoney(ytdExpenses, farm.currency)}</div>
         </div>
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">All farm costs, YTD</div>
-          <div className="text-xl font-bold">{fmtMoney(allYtdCosts, farm.currency)}</div>
-          <div className="text-xs text-muted">incl. feed &amp; vet costs</div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="wheat" />All farm costs, YTD</div>
+          <div className="v num">{fmtMoney(allYtdCosts, farm.currency)}</div>
+          <div className="d">incl. feed &amp; vet costs</div>
         </div>
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Revenue, YTD</div>
-          <div className="text-xl font-bold">{fmtMoney(ytdRevenue, farm.currency)}</div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="tag" />Revenue, YTD</div>
+          <div className="v num">{fmtMoney(ytdRevenue, farm.currency)}</div>
         </div>
-        <div className="card p-4">
-          <div className="text-xs font-bold uppercase text-muted mb-1">Profit / loss, YTD</div>
-          <div className={`text-xl font-bold ${profit >= 0 ? "text-good" : "text-critical"}`}>{fmtMoney(profit, farm.currency)}</div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="scale" />Profit / loss, YTD</div>
+          <div className={`v num ${profit >= 0 ? "text-good" : "text-critical"}`}>{fmtMoney(profit, farm.currency)}</div>
         </div>
       </div>
 
@@ -104,7 +105,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
               <th>Category</th>
               <th>Description</th>
               <th>Vendor</th>
-              <th>Amount</th>
+              <th className="num">Amount</th>
               <th></th>
             </tr>
           </thead>
@@ -117,7 +118,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                 </td>
                 <td>{e.description}</td>
                 <td>{e.vendor || "—"}</td>
-                <td className="font-semibold">{fmtMoney(e.amount, farm.currency)}</td>
+                <td className="font-semibold num">{fmtMoney(e.amount, farm.currency)}</td>
                 <td className="text-right">
                   <form action={deleteExpenseAction} className="inline">
                     <input type="hidden" name="id" value={e.id} />
