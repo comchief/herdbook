@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { fmtWeight, weightUnitLabel } from "@/lib/units";
 import { fmtDate } from "@/lib/format";
 import { fmtMoney } from "@/lib/currency";
+import { getGrowthStageRules } from "@/lib/growth-rules-db";
 
 /** Quotes a CSV field only when it needs it (contains a comma, quote, or
  * newline), doubling any embedded quotes per RFC 4180. */
@@ -27,18 +28,19 @@ export async function GET() {
   const farmId = session.farmId;
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
 
-  const [pigs, breeding, feedInventory, sales] = await Promise.all([
+  const [pigs, breeding, feedInventory, sales, growthRules] = await Promise.all([
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, farmId)),
     db.select().from(schema.breedingRecords).where(eq(schema.breedingRecords.farmId, farmId)),
     db.select().from(schema.feedInventory).where(eq(schema.feedInventory.farmId, farmId)),
     db.select().from(schema.sales).where(eq(schema.sales.farmId, farmId)),
+    getGrowthStageRules(),
   ]);
 
   const pregnant = breeding.filter((b) => !b.actualFarrowDate);
   const totalFeedKg = feedInventory.reduce((s, f) => s + f.stockKg, 0);
   const breedingStockCount = pigs.filter((p) => p.status === "breeding-sow" || p.status === "breeding-boar").length;
   const readyForFinishing = pigs.filter(
-    (p) => ["grower", "finisher"].includes(p.status) && p.targetWeightKg != null && p.currentWeightKg >= p.targetWeightKg
+    (p) => ["grower", "finisher"].includes(p.status) && p.currentWeightKg >= growthRules.finisher.endWeightMinKg
   ).length;
   const rationsBelowReorder = feedInventory.filter((f) => f.stockKg < f.reorderLevelKg).length;
 

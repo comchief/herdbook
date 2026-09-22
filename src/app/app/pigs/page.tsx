@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { eq, asc } from "drizzle-orm";
 import Link from "next/link";
 import { PigsTable } from "@/components/pigs-table";
+import { getGrowthStageRules } from "@/lib/growth-rules-db";
 
 export default async function PigsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();
@@ -12,11 +13,10 @@ export default async function PigsPage({ searchParams }: { searchParams: Promise
   const { error } = await searchParams;
   const isManager = session.role !== "worker";
 
-  const pigs = await db
-    .select()
-    .from(schema.pigs)
-    .where(eq(schema.pigs.farmId, session.farmId))
-    .orderBy(asc(schema.pigs.tag));
+  const [pigs, growthRules] = await Promise.all([
+    db.select().from(schema.pigs).where(eq(schema.pigs.farmId, session.farmId)).orderBy(asc(schema.pigs.tag)),
+    getGrowthStageRules(),
+  ]);
 
   return (
     <div>
@@ -33,7 +33,7 @@ export default async function PigsPage({ searchParams }: { searchParams: Promise
       </div>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
 
-      <PigsTable pigs={pigs} isManager={isManager} unit={unit} />
+      <PigsTable pigs={pigs} isManager={isManager} unit={unit} growthRules={growthRules} />
     </div>
   );
 }

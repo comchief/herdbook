@@ -9,6 +9,8 @@ import { herdWeightTrend, herdComposition } from "@/lib/dashboard-charts";
 import { fmtDate } from "@/lib/format";
 import { kgToDisplay, weightUnitLabel, fmtWeight } from "@/lib/units";
 import { timeToMarket } from "@/lib/growth";
+import { STAGE_LABEL } from "@/lib/growth-rules";
+import { getGrowthStageRules } from "@/lib/growth-rules-db";
 import { fmtMoney, fmtMoneyCompact, currencyFlag } from "@/lib/currency";
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
@@ -27,7 +29,7 @@ export default async function DashboardPage() {
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const unitLabel = weightUnitLabel(unit);
 
-  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs, user] = await Promise.all([
+  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs, user, growthRules] = await Promise.all([
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, farmId)),
     db.select().from(schema.breedingRecords).where(eq(schema.breedingRecords.farmId, farmId)),
     db.select().from(schema.medicalRecords).where(eq(schema.medicalRecords.farmId, farmId)),
@@ -36,6 +38,7 @@ export default async function DashboardPage() {
     db.select().from(schema.expenses).where(eq(schema.expenses.farmId, farmId)),
     db.select().from(schema.feedLogs).where(eq(schema.feedLogs.farmId, farmId)),
     currentUserRecord(session),
+    getGrowthStageRules(),
   ]);
   const firstName = (user?.name ?? "there").split(" ")[0];
 
@@ -46,10 +49,11 @@ export default async function DashboardPage() {
   const salesThisMonth = sales.filter((s) => s.date.toISOString().slice(0, 7) === ym);
   const revenueThisMonth = salesThisMonth.reduce((s, sale) => s + sale.revenue, 0);
   const breedingStockCount = pigs.filter((p) => p.status === "breeding-sow" || p.status === "breeding-boar").length;
-  // "Ready for finishing" = grower/finisher pigs that have already reached their
-  // target market weight — a signal they're due to move on, not just a status label.
+  // "Ready for finishing" = grower/finisher pigs that have already reached
+  // the admin-defined market weight band — a signal they're due to move
+  // on, not just a status label.
   const readyForFinishing = pigs.filter(
-    (p) => ["grower", "finisher"].includes(p.status) && p.targetWeightKg != null && p.currentWeightKg >= p.targetWeightKg
+    (p) => ["grower", "finisher"].includes(p.status) && p.currentWeightKg >= growthRules.finisher.endWeightMinKg
   ).length;
   const rationsBelowReorder = feedInventory.filter((f) => f.stockKg < f.reorderLevelKg).length;
 
@@ -80,25 +84,31 @@ export default async function DashboardPage() {
       });
     }
   }
-  // Pigs falling behind (or past due) on their straight-line growth curve to
-  // market weight — same On track/Behind/Overdue classification as the
-  // pig profile's "Time to market" card, surfaced here so it's visible
-  // without opening every pig.
+  // Pigs falling behind (or past due) on the admin-defined growth-stage
+  // weight bands — same On track/Behind/Overdue classification as the pig
+  // profile's "Time to market" card, surfaced here so it's visible without
+  // opening every pig. Also flags pigs whose recorded status no longer
+  // matches the stage their age now puts them in.
   for (const p of pigs) {
-    const ttm = timeToMarket({
-      status: p.status,
-      dob: p.dob,
-      acquiredDate: p.acquiredDate,
-      currentWeightKg: p.currentWeightKg,
-      targetWeightKg: p.targetWeightKg,
-      targetMonths: p.targetMonths,
-    });
-    if (ttm && ttm.label !== "On track") {
+    const ttm = timeToMarket(
+      { status: p.status, dob: p.dob, acquiredDate: p.acquiredDate, currentWeightKg: p.currentWeightKg },
+      growthRules
+    );
+    if (!ttm) continue;
+    if (ttm.label !== "On track") {
       tasks.push({
-        title: `${p.name} ${ttm.label === "Overdue" ? "overdue" : "behind"} on market weight`,
-        sub: `${fmtWeight(ttm.currentWeightKg, unit)} of ${fmtWeight(ttm.targetWeightKg, unit)} target (${ttm.weightPct}%)`,
+        title: `${p.name} ${ttm.label === "Overdue" ? "overdue" : "behind"} on ${ttm.stageLabel.toLowerCase()} weight`,
+        sub: `${fmtWeight(ttm.currentWeightKg, unit)} of ${fmtWeight(ttm.expectedMinWeightKg, unit)} expected at this age`,
         badge: ttm.label,
-        cls: "critical",
+        cls: ttm.cls === "critical" ? "critical" : "warn",
+        href: `/app/pigs/${p.tag}`,
+      });
+    } else if (ttm.stageMismatch) {
+      tasks.push({
+        title: `${p.name} has grown into ${STAGE_LABEL[ttm.autoStage]}`,
+        sub: `Currently recorded as ${p.status} — update its stage on the pig's profile.`,
+        badge: "stage change",
+        cls: "warn",
         href: `/app/pigs/${p.tag}`,
       });
     }

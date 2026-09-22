@@ -20,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           items={[
             { href: "/admin", label: "Pending payments", icon: "receipt" },
             { href: "/admin/bank-details", label: "Bank details", icon: "card" },
+            { href: "/admin/growth-rules", label: "Growth stage rules", icon: "trend" },
           ]}
         />
         <div className="mt-auto pt-3 border-t border-border">

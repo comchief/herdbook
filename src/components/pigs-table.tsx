@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { growthStatus } from "@/lib/growth";
+import { STAGE_LABEL, type GrowthStageRules } from "@/lib/growth-rules";
 import { deletePigAction } from "@/lib/actions/pigs";
 import { fmtWeight, type WeightUnit } from "@/lib/units";
 import { classifySex } from "@/lib/pig-classification";
@@ -69,13 +70,30 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function GrowthBadge({ pig }: { pig: PigRow }) {
-  const g = growthStatus(pig);
+function GrowthBadge({ pig, growthRules }: { pig: PigRow; growthRules: GrowthStageRules }) {
+  const g = growthStatus(pig, growthRules);
   if (!g) return <span className="badge badge-muted">—</span>;
-  return <span className={`badge badge-${g.cls}`}>{g.label} · {g.pct}%</span>;
+  return (
+    <div>
+      <span className={`badge badge-${g.cls}`}>{g.label} · {g.pct}%</span>
+      {g.stageMismatch && (
+        <div className="text-[10.5px] text-warn mt-1">age suggests {STAGE_LABEL[g.autoStage]}</div>
+      )}
+    </div>
+  );
 }
 
-export function PigsTable({ pigs, isManager, unit }: { pigs: PigRow[]; isManager: boolean; unit: WeightUnit }) {
+export function PigsTable({
+  pigs,
+  isManager,
+  unit,
+  growthRules,
+}: {
+  pigs: PigRow[];
+  isManager: boolean;
+  unit: WeightUnit;
+  growthRules: GrowthStageRules;
+}) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
 
@@ -155,7 +173,7 @@ export function PigsTable({ pigs, isManager, unit }: { pigs: PigRow[]; isManager
                   <StatusBadge status={p.status} />
                 </td>
                 <td>
-                  <GrowthBadge pig={p} />
+                  <GrowthBadge pig={p} growthRules={growthRules} />
                 </td>
                 <td className="text-right whitespace-nowrap">
                   <Link href={`/app/pigs/${encodeURIComponent(p.tag)}`} className="icon-btn mr-1.5" aria-label={`View ${p.name}`}>

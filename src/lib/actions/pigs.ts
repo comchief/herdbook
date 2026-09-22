@@ -176,6 +176,28 @@ export async function updatePigAction(formData: FormData) {
   redirect("/app/pigs");
 }
 
+/** One-click accept for the "grown into a new stage" alert on the pig
+ * profile page and dashboard — just updates the recorded status to match
+ * the stage its age already puts it in (see growthStatus's stageMismatch
+ * in src/lib/growth.ts). Never runs automatically; the person has to
+ * click it. */
+export async function syncPigStageAction(formData: FormData) {
+  const session = await requireManagerSession();
+  const tag = str(formData, "tag");
+  const newStage = str(formData, "newStage");
+  if (!tag || !["piglet", "weaner", "grower", "finisher"].includes(newStage)) redirect("/app/pigs");
+
+  await db
+    .update(schema.pigs)
+    .set({ status: newStage, updatedAt: new Date() })
+    .where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.tag, tag)));
+
+  revalidatePath("/app/pigs");
+  revalidatePath(`/app/pigs/${tag}`);
+  revalidatePath("/app");
+  redirect(`/app/pigs/${encodeURIComponent(tag)}?stageSynced=1`);
+}
+
 export async function deletePigAction(formData: FormData) {
   const session = await requireManagerSession();
   const tag = str(formData, "tag");

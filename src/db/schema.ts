@@ -245,3 +245,32 @@ export const platformBankDetails = pgTable("platform_bank_details", {
   instructions: text("instructions").notNull().default(""),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+/** Platform-wide growth-stage rules (Piglet/Weaner/Grower/Finisher), edited
+ * by the Herdbook operator from the platform admin screen — see
+ * src/lib/growth-rules.ts. One row per stage, keyed by stage name so an
+ * upsert (onConflictDoUpdate on `stage`) is all a save needs.
+ *
+ * Each row is a self-contained age/weight band: `ageMinDays`–`ageMaxDays`
+ * is how old a pig is during this stage, and `startWeight*`/`endWeight*`
+ * are the expected weight range at the start and end of that window. The
+ * app linearly interpolates between them to get an expected weight range
+ * for a pig's exact current age, and classifies it on track/behind/overdue
+ * against that — see stageForAgeDays()/expectedWeightRangeKg() in
+ * growth-rules.ts. Weights are stored canonically in kg, same convention
+ * as pigs.currentWeightKg.
+ *
+ * Missing rows (a fresh install, before the operator has saved anything)
+ * fall back to DEFAULT_STAGE_RULES so growth tracking works out of the
+ * box; a save only ever needs to write the stages being changed. */
+export const growthStageRules = pgTable("growth_stage_rules", {
+  stage: text("stage").primaryKey(), // "piglet" | "weaner" | "grower" | "finisher"
+  order: integer("order").notNull(),
+  ageMinDays: integer("age_min_days").notNull(),
+  ageMaxDays: integer("age_max_days").notNull(),
+  startWeightMinKg: doublePrecision("start_weight_min_kg").notNull(),
+  startWeightMaxKg: doublePrecision("start_weight_max_kg").notNull(),
+  endWeightMinKg: doublePrecision("end_weight_min_kg").notNull(),
+  endWeightMaxKg: doublePrecision("end_weight_max_kg").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

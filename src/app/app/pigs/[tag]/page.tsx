@@ -7,6 +7,9 @@ import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { LineChart, type LinePoint } from "@/components/charts";
 import { growthStatus, timeToMarket } from "@/lib/growth";
+import { STAGE_LABEL } from "@/lib/growth-rules";
+import { getGrowthStageRules } from "@/lib/growth-rules-db";
+import { syncPigStageAction } from "@/lib/actions/pigs";
 import { fmtDate, fmtDateShort } from "@/lib/format";
 import { kgToDisplay, weightUnitLabel, fmtWeight } from "@/lib/units";
 import { classifySex } from "@/lib/pig-classification";
@@ -28,13 +31,20 @@ function ageLabel(d: Date) {
 }
 
 
-export default async function PigProfilePage({ params }: { params: Promise<{ tag: string }> }) {
+export default async function PigProfilePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tag: string }>;
+  searchParams: Promise<{ stageSynced?: string }>;
+}) {
   const session = await requireSession();
   const farm = await requireActiveFarm(session);
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const unitLabel = weightUnitLabel(unit);
   const isManager = session.role !== "worker";
   const { tag } = await params;
+  const { stageSynced } = await searchParams;
   const decodedTag = decodeURIComponent(tag);
 
   const [pig] = await db
@@ -44,12 +54,13 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
     .limit(1);
   if (!pig) notFound();
 
-  const [medical, breeding] = await Promise.all([
+  const [medical, breeding, growthRules] = await Promise.all([
     db.select().from(schema.medicalRecords).where(and(eq(schema.medicalRecords.farmId, session.farmId), eq(schema.medicalRecords.pigTag, pig!.tag))),
     db
       .select()
       .from(schema.breedingRecords)
       .where(and(eq(schema.breedingRecords.farmId, session.farmId))),
+    getGrowthStageRules(),
   ]);
   const relatedBreeding = breeding
     .filter((b) => b.sowTag === pig!.tag || b.boarTag === pig!.tag)
@@ -57,8 +68,8 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
   const recentMedical = [...medical].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
 
   const s = STATUS_STYLE[pig!.status] ?? { cls: "muted", label: pig!.status };
-  const g = growthStatus(pig!);
-  const ttm = timeToMarket(pig!);
+  const g = growthStatus(pig!, growthRules);
+  const ttm = timeToMarket(pig!, growthRules);
 
   const weightLog = Array.isArray(pig!.weightLog) ? (pig!.weightLog as { date: string; weightKg: number }[]) : [];
   const weightPoints: LinePoint[] = weightLog.map((e) => ({
@@ -96,6 +107,25 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
           </Link>
         </div>
       </div>
+
+      {stageSynced && <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">Stage updated.</div>}
+
+      {g && g.stageMismatch && (
+        <div className="mb-4 text-sm rounded-lg px-3 py-2.5 bg-[#fdecc8] text-[#7a4a08] flex items-center justify-between gap-3 flex-wrap">
+          <span>
+            <b>{pig!.name}&apos;s age now matches {STAGE_LABEL[g.autoStage]}</b> — currently recorded as {s.label.toLowerCase()}.
+          </span>
+          {isManager && (
+            <form action={syncPigStageAction}>
+              <input type="hidden" name="tag" value={pig!.tag} />
+              <input type="hidden" name="newStage" value={g.autoStage} />
+              <button type="submit" className="btn btn-small">
+                Move to {STAGE_LABEL[g.autoStage]}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-3.5 mb-3.5">
         <div className="card stat-tile p-[17px_18px]">
@@ -141,23 +171,33 @@ export default async function PigProfilePage({ params }: { params: Promise<{ tag
           </div>
           <div className="flex flex-col gap-2.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted">Current</span>
+              <span className="text-muted">Current stage</span>
+              <span className="font-semibold">{ttm.stageLabel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Current weight</span>
+              <span className="font-semibold num">{fmtWeight(ttm.currentWeightKg, unit)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Expected range at this age</span>
               <span className="font-semibold num">
-                {fmtWeight(ttm.currentWeightKg, unit)} of {fmtWeight(ttm.targetWeightKg, unit)} target ({ttm.weightPct}%)
+                {fmtWeight(ttm.expectedMinWeightKg, unit)} – {fmtWeight(ttm.expectedMaxWeightKg, unit)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">Expected at this age</span>
-              <span className="font-semibold num">{fmtWeight(ttm.expectedWeightKg, unit)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted">Target</span>
-              <span className="font-semibold">
-                {ttm.targetMonths} months from {ttm.ageRefIsDob ? "birth" : "acquired date"}
+              <span className="text-muted">Market weight target</span>
+              <span className="font-semibold num">
+                {fmtWeight(ttm.marketMinWeightKg, unit)} – {fmtWeight(ttm.marketMaxWeightKg, unit)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">{ttm.daysDiff >= 0 ? "Days past target date" : "Days until target date"}</span>
+              <span className="text-muted">Age</span>
+              <span className="font-semibold num">
+                {(ttm.ageDays / 7).toFixed(1)} weeks{!ttm.ageRefIsDob && " (from acquired date)"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">{ttm.daysDiff >= 0 ? "Days past market age" : "Days until market age"}</span>
               <span className="font-semibold num">{Math.abs(ttm.daysDiff)}</span>
             </div>
           </div>
