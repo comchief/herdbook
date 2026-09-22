@@ -9,10 +9,7 @@ import { herdWeightTrend, herdComposition } from "@/lib/dashboard-charts";
 import { fmtDate } from "@/lib/format";
 import { kgToDisplay, weightUnitLabel, fmtWeight } from "@/lib/units";
 import { timeToMarket } from "@/lib/growth";
-
-function fmtMoney(n: number, currency: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
-}
+import { fmtMoney, fmtMoneyCompact, currencyFlag } from "@/lib/currency";
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
@@ -240,14 +237,17 @@ export default async function DashboardPage() {
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3.5">
               <h3 className="font-semibold text-[15.5px]">Revenue vs. expenses</h3>
-              <span className="text-[11.5px] text-muted">year to date</span>
+              <span className="text-[11.5px] text-muted flex items-center gap-1.5">
+                year to date
+                <span aria-hidden="true">{currencyFlag(farm.currency)}</span>
+              </span>
             </div>
             <Donut
               slices={[
                 { label: "Revenue", value: ytdRevenue, color: categoricalColor(0) },
                 { label: "Expenses", value: allCosts, color: categoricalColor(1) },
               ]}
-              centerLabel={fmtMoney(ytdRevenue - allCosts, farm.currency)}
+              centerLabel={fmtMoneyCompact(ytdRevenue - allCosts, farm.currency)}
               centerSub={ytdRevenue - allCosts >= 0 ? "profit" : "loss"}
               valueFormat={(n) => fmtMoney(n, farm.currency)}
             />
@@ -255,11 +255,14 @@ export default async function DashboardPage() {
           <div className="card p-5">
             <div className="flex items-center justify-between mb-3.5">
               <h3 className="font-semibold text-[15.5px]">Where the money goes</h3>
-              <span className="text-[11.5px] text-muted">expenses by category, YTD</span>
+              <span className="text-[11.5px] text-muted flex items-center gap-1.5">
+                expenses by category, YTD
+                <span aria-hidden="true">{currencyFlag(farm.currency)}</span>
+              </span>
             </div>
             <Donut
               slices={expenseSlices}
-              centerLabel={fmtMoney(allCosts, farm.currency)}
+              centerLabel={fmtMoneyCompact(allCosts, farm.currency)}
               centerSub="total"
               valueFormat={(n) => fmtMoney(n, farm.currency)}
             />

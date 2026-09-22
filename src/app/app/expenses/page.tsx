@@ -5,10 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { createExpenseAction, deleteExpenseAction } from "@/lib/actions/expenses";
 import { Icon } from "@/components/icons";
 import { fmtDate } from "@/lib/format";
-
-function fmtMoney(n: number, currency: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
-}
+import { fmtMoney } from "@/lib/currency";
 
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireManager();

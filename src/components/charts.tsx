@@ -21,6 +21,20 @@ function fmtCompact(n: number) {
   return n.toFixed(n % 1 === 0 ? 0 : 1);
 }
 
+/** Shrinks the donut's centered total as its text gets longer, so a big
+ * currency figure ("J$1.2M") or a long count still fits inside the ring
+ * instead of overflowing it. Five characters or fewer render at the normal
+ * size; each character past that scales the font down, bottoming out at a
+ * floor that keeps it legible next to the sub-label beneath it. */
+function donutCenterFontSize(size: number, label: string) {
+  const base = size * 0.135;
+  const floor = size * 0.075;
+  const baselineChars = 5;
+  if (label.length <= baselineChars) return base;
+  const scaled = base * (baselineChars / label.length);
+  return Math.max(scaled, floor);
+}
+
 export type DonutSlice = { label: string; value: number; color?: string };
 
 /** Part-to-whole donut with a centered total and a legend (legend is always
@@ -89,7 +103,14 @@ export function Donut({
               })
           )}
         </g>
-        <text x={cx} y={cy - 3} textAnchor="middle" className="donut-center-v" style={{ fontSize: size * 0.135 }} fill="var(--ink)">
+        <text
+          x={cx}
+          y={cy - 3}
+          textAnchor="middle"
+          className="donut-center-v"
+          style={{ fontSize: donutCenterFontSize(size, centerLabel) }}
+          fill="var(--ink)"
+        >
           {centerLabel}
         </text>
         <text x={cx} y={cy + 15} textAnchor="middle" className="donut-center-l" style={{ fontSize: size * 0.075 }}>

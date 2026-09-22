@@ -4,10 +4,7 @@ import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { fmtWeight, weightUnitLabel } from "@/lib/units";
 import { fmtDate } from "@/lib/format";
-
-function fmtMoney(n: number, currency: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
-}
+import { fmtMoney } from "@/lib/currency";
 
 /** Quotes a CSV field only when it needs it (contains a comma, quote, or
  * newline), doubling any embedded quotes per RFC 4180. */

@@ -6,10 +6,7 @@ import { createSaleAction, deleteSaleAction } from "@/lib/actions/sales";
 import { Icon } from "@/components/icons";
 import { fmtDate } from "@/lib/format";
 import { weightUnitLabel } from "@/lib/units";
-
-function fmtMoney(n: number, currency: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(n);
-}
+import { fmtMoney } from "@/lib/currency";
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireManager();
