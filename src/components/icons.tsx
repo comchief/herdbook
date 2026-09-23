@@ -129,6 +129,34 @@ export function IconSprite() {
       <symbol id="ic-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 7h16M4 12h16M4 17h16" />
       </symbol>
+      <symbol id="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="4.2" />
+        <path d="M12 3v2.2M12 18.8V21M4.2 12H6.4M17.6 12h2.2M6 6l1.5 1.5M16.5 16.5 18 18M6 18l1.5-1.5M16.5 7.5 18 6" />
+      </symbol>
+      <symbol id="ic-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7.5 18.5a4.2 4.2 0 0 1-.4-8.4 5.8 5.8 0 0 1 11.2-2 4.6 4.6 0 0 1-.8 10.4H7.5Z" />
+      </symbol>
+      <symbol id="ic-cloud-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="7" r="2.6" />
+        <path d="M8 2.3v1.4M3.3 7H4.7M4.9 3.9l1 1M11.1 3.9l-1 1" />
+        <path d="M9.5 19.5a4 4 0 0 1-.4-8 5.3 5.3 0 0 1 10.3-1.6A4.3 4.3 0 0 1 18.7 19.5H9.5Z" />
+      </symbol>
+      <symbol id="ic-cloud-rain" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 15.5a4 4 0 0 1-.4-8 5.5 5.5 0 0 1 10.6-1.8A4.4 4.4 0 0 1 16.8 15.5H7Z" />
+        <path d="M8 18.5l-1 2M12 18.5l-1 2M16 18.5l-1 2" />
+      </symbol>
+      <symbol id="ic-cloud-lightning" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 14.5a4 4 0 0 1-.4-8 5.5 5.5 0 0 1 10.6-1.8A4.4 4.4 0 0 1 16.8 14.5H7Z" />
+        <path d="M12.5 14l-3 5h3l-1.5 4 4.5-6h-3l1.5-3Z" fill="currentColor" stroke="none" />
+      </symbol>
+      <symbol id="ic-snow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 13.5a4 4 0 0 1-.4-8 5.5 5.5 0 0 1 10.6-1.8A4.4 4.4 0 0 1 16.8 13.5H7Z" />
+        <path d="M8 17v4M6.3 18.2l3.4 1.6M9.7 18.2l-3.4 1.6M16 17v4M14.3 18.2l3.4 1.6M17.7 18.2l-3.4 1.6" />
+      </symbol>
+      <symbol id="ic-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z" />
+        <circle cx="12" cy="9" r="2.4" />
+      </symbol>
     </svg>
   );
 }

@@ -34,6 +34,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <option value="lbs">Pounds (lb)</option>
           </select>
         </div>
+        <div className="field">
+          <label>Farm location</label>
+          <input name="location" defaultValue={farm.locationName ?? ""} placeholder="e.g. Kingston, Jamaica" />
+          <p className="text-[11px] text-muted mt-1">
+            Used to show the dashboard&apos;s greeting and weather in your farm&apos;s local time. Clear it to turn that off.
+          </p>
+        </div>
         <button type="submit" className="btn btn-primary">
           Save settings
         </button>

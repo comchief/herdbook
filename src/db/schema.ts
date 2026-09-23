@@ -27,6 +27,15 @@ export const farms = pgTable("farms", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   trialEndsAt: timestamp("trial_ends_at").notNull(),
   paidThroughDate: timestamp("paid_through_date"),
+  // Set together from a single geocode lookup when the owner saves a
+  // location in Farm settings (see src/lib/weather.ts) — never edited by
+  // hand. locationName is the resolved display label ("Kingston,
+  // Jamaica"), not necessarily what they typed. Powers the dashboard's
+  // local greeting time and weather summary; all null until set.
+  locationName: text("location_name"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  timezone: text("timezone"), // IANA name, e.g. "America/Jamaica"
 });
 
 export const users = pgTable(

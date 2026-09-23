@@ -12,9 +12,13 @@ import { timeToMarket } from "@/lib/growth";
 import { STAGE_LABEL } from "@/lib/growth-rules";
 import { getGrowthStageRules } from "@/lib/growth-rules-db";
 import { fmtMoney, fmtMoneyCompact, currencyFlag } from "@/lib/currency";
+import { fetchCurrentWeather, localHour } from "@/lib/weather";
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
+/** Time-of-day greeting, in the farm's own local time (see localHour) —
+ * not the server's, which runs in UTC and would otherwise say "Good
+ * morning" to a farm that's had its evening chores done for hours. */
 function greeting(hour: number) {
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
@@ -25,11 +29,13 @@ export default async function DashboardPage() {
   const session = await requireSession();
   const farm = await requireActiveFarm(session);
   const isManager = session.role !== "worker";
+  const isOwner = session.role === "owner";
   const farmId = session.farmId;
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const unitLabel = weightUnitLabel(unit);
+  const hasLocation = farm.latitude != null && farm.longitude != null && !!farm.timezone;
 
-  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs, user, growthRules] = await Promise.all([
+  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs, user, growthRules, weather] = await Promise.all([
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, farmId)),
     db.select().from(schema.breedingRecords).where(eq(schema.breedingRecords.farmId, farmId)),
     db.select().from(schema.medicalRecords).where(eq(schema.medicalRecords.farmId, farmId)),
@@ -39,8 +45,10 @@ export default async function DashboardPage() {
     db.select().from(schema.feedLogs).where(eq(schema.feedLogs.farmId, farmId)),
     currentUserRecord(session),
     getGrowthStageRules(),
+    hasLocation ? fetchCurrentWeather(farm.latitude!, farm.longitude!, farm.timezone!) : Promise.resolve(null),
   ]);
   const firstName = (user?.name ?? "there").split(" ")[0];
+  const localHr = localHour(farm.timezone);
 
   const pregnant = breeding.filter((b) => !b.actualFarrowDate);
   const totalFeedKg = feedInventory.reduce((s, f) => s + f.stockKg, 0);
@@ -150,11 +158,37 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-ink">
-          {greeting(today.getHours())}, {firstName}
-        </h1>
-        <p className="text-ink-soft text-sm">Here&apos;s how the herd is doing at {farm.name} today.</p>
+      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-ink">
+            {greeting(localHr)}, {firstName}
+          </h1>
+          <p className="text-ink-soft text-sm">Here&apos;s how the herd is doing at {farm.name} today.</p>
+        </div>
+        {weather ? (
+          <div className="card flex items-center gap-3 px-4 py-3">
+            <Icon name={weather.icon} className="w-9 h-9 text-accent shrink-0" />
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold text-ink num">{Math.round(weather.tempC)}°C</span>
+                <span className="text-sm text-ink-soft">{weather.label}</span>
+              </div>
+              <div className="text-[11.5px] text-muted flex items-center gap-1 mt-0.5">
+                <Icon name="map-pin" className="w-3 h-3 shrink-0" />
+                <span className="truncate">
+                  {farm.locationName} · H:{Math.round(weather.highC)}° L:{Math.round(weather.lowC)}°
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          isOwner &&
+          !hasLocation && (
+            <Link href="/app/settings" className="text-xs font-semibold text-accent self-center whitespace-nowrap">
+              Set your farm&apos;s location for local weather →
+            </Link>
+          )
+        )}
       </div>
 
       <div className="flex items-center gap-2.5 mb-6">
