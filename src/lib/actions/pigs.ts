@@ -32,13 +32,19 @@ function dateOrNull(fd: FormData, key: string): Date | null {
 type WeightLogEntry = { date: string; weightKg: number };
 
 /** Appends a weigh-in to a pig's history (used to drive the dashboard's herd
- * weight trend chart), keeping only the most recent 36 entries. */
-function appendWeightLog(existing: unknown, weightKg: number | null): WeightLogEntry[] {
+ * weight trend chart, and — for acquired-only pigs — to track growth off
+ * the acquisition weight; see src/lib/growth.ts), keeping only the most
+ * recent 36 entries. Dated `today` unless `dateOverride` is given: creating
+ * an acquired-only pig (acquiredDate, no dob) dates its first entry at the
+ * acquired date instead, so it reads as "weight as of acquisition" rather
+ * than "weight as of whenever this got entered into the system". */
+function appendWeightLog(existing: unknown, weightKg: number | null, dateOverride?: string): WeightLogEntry[] {
   const log: WeightLogEntry[] = Array.isArray(existing) ? (existing as WeightLogEntry[]) : [];
   if (weightKg === null || weightKg <= 0) return log;
   const today = new Date().toISOString().slice(0, 10);
+  const date = dateOverride && dateOverride <= today ? dateOverride : today;
   const last = log[log.length - 1];
-  const next = last && last.date === today ? [...log.slice(0, -1), { date: today, weightKg }] : [...log, { date: today, weightKg }];
+  const next = last && last.date === date ? [...log.slice(0, -1), { date, weightKg }] : [...log, { date, weightKg }];
   return next.slice(-36);
 }
 
@@ -65,6 +71,19 @@ export async function createPigAction(formData: FormData) {
   const targetWeightInput = num(formData, "targetWeightKg");
   const weight = weightInput === null ? null : displayToKg(weightInput, unit);
   const targetWeightKg = targetWeightInput === null ? null : displayToKg(targetWeightInput, unit);
+
+  // With no date of birth, the pig's age can't be known — only how long
+  // it's been on the farm. A weight at acquisition is required so growth
+  // can still be tracked, off that weight, instead of off a guessed age
+  // (see src/lib/growth.ts).
+  const acquiredOnly = !dob && !!acquiredDate;
+  if (acquiredOnly && (weight === null || weight <= 0)) {
+    redirect(
+      "/app/pigs?error=" +
+        encodeURIComponent("A starting weight is required when using an acquired date instead of a date of birth — it's used to track growth from here.")
+    );
+  }
+
   await db.insert(schema.pigs).values({
     farmId: session.farmId,
     tag,
@@ -81,7 +100,7 @@ export async function createPigAction(formData: FormData) {
     targetMonths: num(formData, "targetMonths"),
     notes: str(formData, "notes") || null,
     acquiredDate: acquiredDate,
-    weightLog: appendWeightLog([], weight),
+    weightLog: appendWeightLog([], weight, acquiredOnly ? acquiredDate!.toISOString().slice(0, 10) : undefined),
   });
 
   revalidatePath("/app/pigs");
@@ -121,6 +140,18 @@ export async function updatePigAction(formData: FormData) {
   const newWeight = newWeightInput === null ? null : displayToKg(newWeightInput, unit);
   const newTargetWeightKg = newTargetWeightInput === null ? null : displayToKg(newTargetWeightInput, unit);
   const weightChanged = newWeight !== null && newWeight !== pig!.currentWeightKg;
+
+  // Same requirement as adding a pig: with no dob, growth is tracked off
+  // the weight on file rather than a guessed age, so it can't be blank.
+  const acquiredOnly = !dob && !!acquiredDate;
+  const effectiveWeight = newWeight ?? pig!.currentWeightKg;
+  if (acquiredOnly && effectiveWeight <= 0) {
+    redirect(
+      "/app/pigs?error=" +
+        encodeURIComponent("A starting weight is required when using an acquired date instead of a date of birth — it's used to track growth from here.")
+    );
+  }
+
   await db
     .update(schema.pigs)
     .set({

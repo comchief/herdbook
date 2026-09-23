@@ -113,7 +113,10 @@ export default async function PigProfilePage({
       {g && g.stageMismatch && (
         <div className="mb-4 text-sm rounded-lg px-3 py-2.5 bg-[#fdecc8] text-[#7a4a08] flex items-center justify-between gap-3 flex-wrap">
           <span>
-            <b>{pig!.name}&apos;s age now matches {STAGE_LABEL[g.autoStage]}</b> — currently recorded as {s.label.toLowerCase()}.
+            <b>
+              {pig!.name}&apos;s {pig!.dob ? "age" : "weight"} now matches {STAGE_LABEL[g.autoStage]}
+            </b>{" "}
+            — currently recorded as {s.label.toLowerCase()}.
           </span>
           {isManager && (
             <form action={syncPigStageAction}>
@@ -138,10 +141,10 @@ export default async function PigProfilePage({
         <div className="card stat-tile p-[17px_18px]">
           <div className="k">
             <Icon name="calendar" />
-            Age
+            {pig!.dob ? "Age" : "Time on farm"}
           </div>
           <div className="v num">{ageText}</div>
-          {!pig!.dob && pig!.acquiredDate && <div className="d">* approximate, from acquired date</div>}
+          {!pig!.dob && pig!.acquiredDate && <div className="d">from acquired date — growth is tracked by weight instead</div>}
         </div>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k">
@@ -179,7 +182,7 @@ export default async function PigProfilePage({
               <span className="font-semibold num">{fmtWeight(ttm.currentWeightKg, unit)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">Expected range at this age</span>
+              <span className="text-muted">{ttm.ageRefIsDob ? "Expected range at this age" : "Expected range for this stage"}</span>
               <span className="font-semibold num">
                 {fmtWeight(ttm.expectedMinWeightKg, unit)} – {fmtWeight(ttm.expectedMaxWeightKg, unit)}
               </span>
@@ -191,15 +194,26 @@ export default async function PigProfilePage({
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">Age</span>
+              <span className="text-muted">{ttm.ageRefIsDob ? "Age" : "Time on farm"}</span>
               <span className="font-semibold num">
                 {(ttm.ageDays / 7).toFixed(1)} weeks{!ttm.ageRefIsDob && " (from acquired date)"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted">{ttm.daysDiff >= 0 ? "Days past market age" : "Days until market age"}</span>
-              <span className="font-semibold num">{Math.abs(ttm.daysDiff)}</span>
-            </div>
+            {ttm.ageRefIsDob ? (
+              <div className="flex justify-between">
+                <span className="text-muted">{ttm.daysDiff >= 0 ? "Days past market age" : "Days until market age"}</span>
+                <span className="font-semibold num">{Math.abs(ttm.daysDiff)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between">
+                <span className="text-muted">Growth rate</span>
+                <span className="font-semibold num">
+                  {ttm.actualAdgKgPerDay === null
+                    ? "Not enough weigh-ins yet"
+                    : `${fmtWeight(ttm.actualAdgKgPerDay * 7, unit)}/wk of ${fmtWeight((ttm.expectedAdgKgPerDay ?? 0) * 7, unit)}/wk expected`}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

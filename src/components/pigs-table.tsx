@@ -22,6 +22,9 @@ export type PigRow = {
   status: string;
   targetWeightKg: number | null;
   targetMonths: number | null;
+  /** Needed by growthStatus() to find the acquisition-weight baseline for
+   * pigs tracked by weight gain rather than age — see src/lib/growth.ts. */
+  weightLog: unknown;
 };
 
 const STATUS_STYLE: Record<string, { cls: string; label: string }> = {
@@ -77,7 +80,7 @@ function GrowthBadge({ pig, growthRules }: { pig: PigRow; growthRules: GrowthSta
     <div>
       <span className={`badge badge-${g.cls}`}>{g.label} · {g.pct}%</span>
       {g.stageMismatch && (
-        <div className="text-[10.5px] text-warn mt-1">age suggests {STAGE_LABEL[g.autoStage]}</div>
+        <div className="text-[10.5px] text-warn mt-1">{pig.dob ? "age" : "weight"} suggests {STAGE_LABEL[g.autoStage]}</div>
       )}
     </div>
   );

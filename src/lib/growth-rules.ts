@@ -112,6 +112,31 @@ export function stageForAgeDays(ageDays: number, rules: GrowthStageRules): Stage
   return rules.finisher;
 }
 
+/** The stage a pig's *weight* puts it in — used instead of
+ * stageForAgeDays() when a pig's true age is unknown (acquired stock with
+ * no recorded date of birth, so "days since acquired" isn't a real age).
+ * Each stage's start band equals the previous stage's end band, so walking
+ * by endWeightMinKg the same way stageForAgeDays walks by ageMaxDays gives
+ * the stage whose band actually contains this weight. Weight at or past
+ * the Finisher band's minimum still resolves to "finisher". */
+export function stageForWeightKg(weightKg: number, rules: GrowthStageRules): StageRule {
+  const ordered = STAGE_ORDER.map((k) => rules[k]);
+  for (const rule of ordered) {
+    if (weightKg < rule.endWeightMinKg) return rule;
+  }
+  return rules.finisher;
+}
+
+/** Expected average daily gain (kg/day) for a stage, based on its minimum
+ * weight band — the same "minimum acceptable" curve expectedWeightRangeKg
+ * uses for its on-track/behind comparison. Used to judge growth for pigs
+ * tracked by weight gain rather than age (see stageForWeightKg above). */
+export function expectedAdgKgPerDay(rule: StageRule): number {
+  const span = rule.ageMaxDays - rule.ageMinDays;
+  if (span <= 0) return 0;
+  return (rule.endWeightMinKg - rule.startWeightMinKg) / span;
+}
+
 /** Expected weight range (kg) for a given age within a stage: a
  * straight-line interpolation between the stage's start and end bands. */
 export function expectedWeightRangeKg(ageDays: number, rule: StageRule): { minKg: number; maxKg: number } {

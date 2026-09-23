@@ -85,20 +85,21 @@ export default async function DashboardPage() {
     }
   }
   // Pigs falling behind (or past due) on the admin-defined growth-stage
-  // weight bands — same On track/Behind/Overdue classification as the pig
+  // weight bands — same On track/Behind[/Overdue] classification as the pig
   // profile's "Time to market" card, surfaced here so it's visible without
   // opening every pig. Also flags pigs whose recorded status no longer
-  // matches the stage their age now puts them in.
+  // matches the stage their age (or, with no dob, their weight) now puts
+  // them in.
   for (const p of pigs) {
     const ttm = timeToMarket(
-      { status: p.status, dob: p.dob, acquiredDate: p.acquiredDate, currentWeightKg: p.currentWeightKg },
+      { status: p.status, dob: p.dob, acquiredDate: p.acquiredDate, currentWeightKg: p.currentWeightKg, weightLog: p.weightLog },
       growthRules
     );
     if (!ttm) continue;
     if (ttm.label !== "On track") {
       tasks.push({
         title: `${p.name} ${ttm.label === "Overdue" ? "overdue" : "behind"} on ${ttm.stageLabel.toLowerCase()} weight`,
-        sub: `${fmtWeight(ttm.currentWeightKg, unit)} of ${fmtWeight(ttm.expectedMinWeightKg, unit)} expected at this age`,
+        sub: `${fmtWeight(ttm.currentWeightKg, unit)} of ${fmtWeight(ttm.expectedMinWeightKg, unit)} expected ${ttm.ageRefIsDob ? "at this age" : "for this stage"}`,
         badge: ttm.label,
         cls: ttm.cls === "critical" ? "critical" : "warn",
         href: `/app/pigs/${p.tag}`,

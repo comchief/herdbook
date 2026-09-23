@@ -71,6 +71,9 @@ export default async function NewPigPage() {
           <div className="field">
             <label>Current weight ({unitLabel})</label>
             <input type="number" step="0.1" min="0" name="weight" required placeholder={unit === "lbs" ? "54" : "24.5"} />
+            <p className="text-[11px] text-muted mt-1">
+              If there&apos;s no date of birth, this is treated as the weight at acquisition and used to track growth from here.
+            </p>
           </div>
           <div className="field">
             <label>Sire (boar)</label>
