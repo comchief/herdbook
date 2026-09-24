@@ -157,6 +157,10 @@ export function IconSprite() {
         <path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z" />
         <circle cx="12" cy="9" r="2.4" />
       </symbol>
+      <symbol id="ic-pill" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3.5" y="9.5" width="17" height="8" rx="4" transform="rotate(-35 12 13.5)" />
+        <path d="M10.3 10.9 13.7 16.1" />
+      </symbol>
     </svg>
   );
 }

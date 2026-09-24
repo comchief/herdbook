@@ -16,6 +16,7 @@ export default async function NewPigPage() {
   const pigs = await db.select().from(schema.pigs).where(eq(schema.pigs.farmId, session.farmId));
   const boars = pigs.filter((p) => p.status === "breeding-boar");
   const sows = pigs.filter((p) => p.status === "breeding-sow");
+  const breeds = await db.select().from(schema.pigBreeds).where(eq(schema.pigBreeds.farmId, session.farmId)).orderBy(schema.pigBreeds.name);
 
   return (
     <div className="max-w-2xl">
@@ -32,11 +33,19 @@ export default async function NewPigPage() {
           </div>
           <div className="field">
             <label>Breed</label>
-            <select name="breed" defaultValue="Duroc">
-              {["Duroc", "Yorkshire", "Landrace", "Hampshire", "Berkshire", "Tamworth", "Crossbred"].map((b) => (
-                <option key={b}>{b}</option>
+            <select name="breed" defaultValue="">
+              <option value="">— none —</option>
+              {breeds.map((b) => (
+                <option key={b.id} value={b.name}>
+                  {b.name}
+                </option>
               ))}
             </select>
+            {breeds.length === 0 && (
+              <p className="text-[11px] text-muted mt-1">
+                No breeds saved yet — add some in <Link href="/app/settings" className="text-accent font-semibold">Farm settings</Link>.
+              </p>
+            )}
           </div>
           <div className="field">
             <label>Sex</label>

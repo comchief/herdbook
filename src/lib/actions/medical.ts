@@ -23,8 +23,13 @@ export async function createMedicalAction(formData: FormData) {
   const pigTag = str(formData, "pigTag");
   const date = str(formData, "date");
   const description = str(formData, "description");
+  const type = str(formData, "type") || "treatment";
+  const medicationName = str(formData, "medicationName");
   if (!pigTag || !date || !description) {
     redirect("/app/medical?error=" + encodeURIComponent("Pig, date and description are required."));
+  }
+  if (type === "medication" && !medicationName) {
+    redirect("/app/medical?error=" + encodeURIComponent("Select which medication was administered."));
   }
 
   const [pig] = await db
@@ -40,8 +45,9 @@ export async function createMedicalAction(formData: FormData) {
     pigTag,
     pigName: pig?.name ?? pigTag,
     date: new Date(date),
-    type: str(formData, "type") || "treatment",
+    type,
     description,
+    medicationName: type === "medication" ? medicationName : null,
     administeredBy: str(formData, "administeredBy") || null,
     cost: num(formData, "cost"),
     nextDueDate: nextDueDate ? new Date(nextDueDate) : null,

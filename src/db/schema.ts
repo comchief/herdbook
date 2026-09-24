@@ -98,6 +98,46 @@ export const pigs = pgTable(
   (t) => [uniqueIndex("pigs_farm_tag_idx").on(t.farmId, t.tag), index("pigs_farm_idx").on(t.farmId)]
 );
 
+/** A farm's own list of pig breeds, offered on the "Add/edit a pig" Breed
+ * dropdown. Seeded with DEFAULT_BREEDS (src/lib/breeds.ts) when a farm
+ * signs up (see signupAction) so every farm starts with the same built-in
+ * set already there as ordinary rows — the owner can then rename or delete
+ * any of them from Farm settings exactly like one they added themselves.
+ * A farm can end up with zero rows if every breed is deleted; the pig
+ * forms handle that (see src/app/app/pigs/new and .../[tag]/edit). */
+export const pigBreeds = pgTable(
+  "pig_breeds",
+  {
+    id: id(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pig_breeds_farm_name_idx").on(t.farmId, t.name), index("pig_breeds_farm_idx").on(t.farmId)]
+);
+
+/** A farm's own list of medications it keeps on hand, with a note on what
+ * each is used for. Managed from Farm settings; offered as a picker on the
+ * health page whenever a "Medication" record is logged (see
+ * src/lib/actions/medical.ts and the medical page's type dropdown). Starts
+ * empty for every farm — unlike pigBreeds there's no sensible built-in
+ * list to pre-load here. */
+export const medications = pgTable(
+  "medications",
+  {
+    id: id(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    use: text("use"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("medications_farm_name_idx").on(t.farmId, t.name), index("medications_farm_idx").on(t.farmId)]
+);
+
 export const medicalRecords = pgTable(
   "medical_records",
   {
@@ -110,6 +150,10 @@ export const medicalRecords = pgTable(
     date: timestamp("date").notNull(),
     type: text("type").notNull(),
     description: text("description").notNull(),
+    // Set only when type === "medication" — the chosen medication's name,
+    // denormalized (like pigName) so the record still reads correctly even
+    // if that medication is later renamed or deleted from Farm settings.
+    medicationName: text("medication_name"),
     administeredBy: text("administered_by"),
     cost: doublePrecision("cost").notNull().default(0),
     nextDueDate: timestamp("next_due_date"),

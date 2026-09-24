@@ -5,6 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { createMedicalAction, dismissFollowupAction, deleteMedicalAction } from "@/lib/actions/medical";
 import { Icon } from "@/components/icons";
 import { fmtDate } from "@/lib/format";
+import { MedicalTypeFields } from "@/components/medical-type-fields";
 
 export default async function MedicalPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();
@@ -12,9 +13,10 @@ export default async function MedicalPage({ searchParams }: { searchParams: Prom
   const { error } = await searchParams;
   const isManager = session.role !== "worker";
 
-  const [records, pigs] = await Promise.all([
+  const [records, pigs, medications] = await Promise.all([
     db.select().from(schema.medicalRecords).where(eq(schema.medicalRecords.farmId, session.farmId)).orderBy(desc(schema.medicalRecords.date)),
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, session.farmId)),
+    db.select().from(schema.medications).where(eq(schema.medications.farmId, session.farmId)).orderBy(schema.medications.name),
   ]);
 
   const now = new Date();
@@ -61,16 +63,7 @@ export default async function MedicalPage({ searchParams }: { searchParams: Prom
             <label>Date</label>
             <input type="date" name="date" required />
           </div>
-          <div className="field">
-            <label>Type</label>
-            <select name="type" defaultValue="treatment">
-              <option value="vaccination">Vaccination</option>
-              <option value="treatment">Treatment</option>
-              <option value="checkup">Check-up</option>
-              <option value="injury">Injury</option>
-              <option value="deworming">Deworming</option>
-            </select>
-          </div>
+          <MedicalTypeFields medications={medications} />
           <div className="field col-span-2 md:col-span-3">
             <label>Description</label>
             <textarea name="description" required rows={2} placeholder="e.g. Erysipelas booster, left flank" />
@@ -114,6 +107,7 @@ export default async function MedicalPage({ searchParams }: { searchParams: Prom
                 <td>{fmtDate(m.date)}</td>
                 <td>
                   <span className="badge badge-info">{m.type}</span>
+                  {m.medicationName && <div className="text-[11px] text-muted mt-0.5 truncate">{m.medicationName}</div>}
                 </td>
                 <td className="max-w-xs truncate">{m.description}</td>
                 <td>{fmtDate(m.nextDueDate)}</td>

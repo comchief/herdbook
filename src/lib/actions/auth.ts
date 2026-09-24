@@ -7,6 +7,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth";
 import { setSessionCookie, clearSessionCookie, readSession } from "@/lib/session";
 import { TRIAL_DAYS } from "@/lib/subscription";
 import { revalidatePath } from "next/cache";
+import { DEFAULT_BREEDS } from "@/lib/breeds";
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB — plenty for a profile photo, small enough to store inline
 
@@ -36,6 +37,11 @@ export async function signupAction(formData: FormData) {
     .insert(schema.farms)
     .values({ name: farmName, trialEndsAt: addDays(now, TRIAL_DAYS) })
     .returning();
+
+  // Pre-load the farm's breed list with the built-in defaults as ordinary,
+  // editable rows — Farm settings lets the owner rename or delete any of
+  // them from here on, same as one they add themselves.
+  await db.insert(schema.pigBreeds).values(DEFAULT_BREEDS.map((name) => ({ farmId: farm.id, name })));
 
   const passwordHash = await hashPassword(password);
   const isPlatformAdmin =

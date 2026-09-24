@@ -26,6 +26,12 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
   const pigs = await db.select().from(schema.pigs).where(eq(schema.pigs.farmId, session.farmId));
   const boars = pigs.filter((p) => p.status === "breeding-boar" || p.tag === pig!.sireTag);
   const sows = pigs.filter((p) => p.status === "breeding-sow" || p.tag === pig!.damTag);
+  const breeds = await db.select().from(schema.pigBreeds).where(eq(schema.pigBreeds.farmId, session.farmId)).orderBy(schema.pigBreeds.name);
+  // If this pig's current breed was since renamed or deleted from Farm
+  // settings, keep it selectable so an unrelated save doesn't silently
+  // switch the pig to whatever option happens to be first in the list.
+  const breedOptions =
+    pig!.breed && !breeds.some((b) => b.name === pig!.breed) ? [{ id: "current", name: pig!.breed }, ...breeds] : breeds;
 
   const dobStr = pig!.dob ? pig!.dob.toISOString().slice(0, 10) : "";
   const acquiredDateStr = pig!.acquiredDate ? pig!.acquiredDate.toISOString().slice(0, 10) : "";
@@ -46,9 +52,12 @@ export default async function EditPigPage({ params }: { params: Promise<{ tag: s
           </div>
           <div className="field">
             <label>Breed</label>
-            <select name="breed" defaultValue={pig!.breed ?? "Duroc"}>
-              {["Duroc", "Yorkshire", "Landrace", "Hampshire", "Berkshire", "Tamworth", "Crossbred"].map((b) => (
-                <option key={b}>{b}</option>
+            <select name="breed" defaultValue={pig!.breed ?? ""}>
+              <option value="">— none —</option>
+              {breedOptions.map((b) => (
+                <option key={b.id} value={b.name}>
+                  {b.name}
+                </option>
               ))}
             </select>
           </div>
