@@ -219,6 +219,12 @@ export const feedLogs = pgTable(
     date: timestamp("date").notNull(),
     notes: text("notes"),
     source: text("source"), // "manual" | "calendar"
+    // Set only for a usage log created by the "Log feeding" button on the
+    // feed management page's feeding calendar (source === "calendar") — the
+    // pen it was logged for, so the calendar can tell whether that pen has
+    // already been confirmed fed today (per-pig) or this cycle (bulk). Null
+    // for manually-logged movements, which aren't tied to a pen.
+    pen: text("pen"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("feedlog_farm_idx").on(t.farmId)]

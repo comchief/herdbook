@@ -13,6 +13,7 @@ import { STAGE_LABEL } from "@/lib/growth-rules";
 import { getGrowthStageRules } from "@/lib/growth-rules-db";
 import { fmtMoney, fmtMoneyCompact, currencyFlag } from "@/lib/currency";
 import { fetchCurrentWeather, localHour } from "@/lib/weather";
+import { dailyConsumptionByRation } from "@/lib/feed-consumption";
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
@@ -35,7 +36,7 @@ export default async function DashboardPage() {
   const unitLabel = weightUnitLabel(unit);
   const hasLocation = farm.latitude != null && farm.longitude != null && !!farm.timezone;
 
-  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs, user, growthRules, weather] = await Promise.all([
+  const [pigs, breeding, medical, feedInventory, sales, expenses, feedLogs, penFeedPlans, user, growthRules, weather] = await Promise.all([
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, farmId)),
     db.select().from(schema.breedingRecords).where(eq(schema.breedingRecords.farmId, farmId)),
     db.select().from(schema.medicalRecords).where(eq(schema.medicalRecords.farmId, farmId)),
@@ -43,6 +44,7 @@ export default async function DashboardPage() {
     db.select().from(schema.sales).where(eq(schema.sales.farmId, farmId)),
     db.select().from(schema.expenses).where(eq(schema.expenses.farmId, farmId)),
     db.select().from(schema.feedLogs).where(eq(schema.feedLogs.farmId, farmId)),
+    db.select().from(schema.penFeedPlans).where(eq(schema.penFeedPlans.farmId, farmId)),
     currentUserRecord(session),
     getGrowthStageRules(),
     hasLocation ? fetchCurrentWeather(farm.latitude!, farm.longitude!, farm.timezone!) : Promise.resolve(null),
@@ -65,8 +67,64 @@ export default async function DashboardPage() {
   ).length;
   const rationsBelowReorder = feedInventory.filter((f) => f.stockKg < f.reorderLevelKg).length;
 
+  // Feed runs-out estimate: farm-wide daily consumption per ration (per-pig
+  // plans plus bulk pens' total/duration daily-equivalent — see
+  // dailyConsumptionByRation), divided into that ration's stock on hand.
+  // Surfaced as the most urgent ration, since that's the one that actually
+  // forces a decision first.
+  const consumptionRates = dailyConsumptionByRation(pigs, penFeedPlans);
+  const todayStr = today.toISOString().slice(0, 10);
+  let mostUrgentFeed: { feedType: string; daysLeft: number } | null = null;
+  for (const f of feedInventory) {
+    const rate = consumptionRates.get(f.feedType) ?? 0;
+    if (rate <= 0) continue;
+    const daysLeft = f.stockKg / rate;
+    if (!mostUrgentFeed || daysLeft < mostUrgentFeed.daysLeft) mostUrgentFeed = { feedType: f.feedType, daysLeft };
+  }
+
+  // Pens grouped the same way the feeding calendar groups them (see
+  // src/app/app/feed/page.tsx), so "was today's feeding logged" and "is
+  // this bulk pen overdue" agree with what the Feed page itself shows.
+  const feedPens = new Map<string, typeof pigs>();
+  for (const p of pigs) {
+    const pen = p.pen || "Unassigned";
+    if (!feedPens.has(pen)) feedPens.set(pen, []);
+    feedPens.get(pen)!.push(p);
+  }
+  const bulkPlanByPen = new Map(penFeedPlans.map((p) => [p.pen, p]));
+
   type Task = { title: string; sub: string; badge: string; cls: "critical" | "warn"; href: string };
   const tasks: Task[] = [];
+  for (const [penName, penPigs] of feedPens) {
+    const plan = bulkPlanByPen.get(penName);
+    if (plan) {
+      const daysLeft = plan.durationDays - daysBetween(plan.startDate, today);
+      if (daysLeft <= 0) {
+        tasks.push({
+          title: `${penName} — bulk feeding due for a top-up`,
+          sub: daysLeft === 0 ? `Due today · ${plan.feedType}` : `${Math.abs(daysLeft)} days overdue · ${plan.feedType}`,
+          badge: daysLeft < 0 ? "overdue" : "upcoming",
+          cls: daysLeft < 0 ? "critical" : "warn",
+          href: "/app/feed",
+        });
+      }
+    } else {
+      const onPlan = penPigs.some((p) => p.feedRation && (p.dailyFeedKg ?? 0) > 0);
+      if (!onPlan) continue;
+      const loggedToday = feedLogs.some(
+        (l) => l.pen === penName && l.source === "calendar" && l.date.toISOString().slice(0, 10) === todayStr
+      );
+      if (!loggedToday) {
+        tasks.push({
+          title: `${penName} — feeding not logged today`,
+          sub: "Log today's feeding on the Feed page once it's done.",
+          badge: "not logged",
+          cls: "warn",
+          href: "/app/feed",
+        });
+      }
+    }
+  }
   for (const b of pregnant) {
     const d = daysBetween(today, b.expectedFarrowDate);
     if (d <= 30) {
@@ -204,7 +262,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isManager ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-3.5 mb-4`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isManager ? "lg:grid-cols-5" : "lg:grid-cols-4"} gap-3.5 mb-4`}>
         <div className="card stat-tile p-[17px_18px]">
           <div className="k"><Icon name="pig" />Total herd</div>
           <div className="v num">{pigs.length}</div>
@@ -222,6 +280,13 @@ export default async function DashboardPage() {
           <div className="v num">{fmtWeight(totalFeedKg, unit, 0)}</div>
           <div className={`d${rationsBelowReorder > 0 ? " warn" : ""}`}>
             {rationsBelowReorder === 0 ? "All rations stocked" : `${rationsBelowReorder} ${rationsBelowReorder === 1 ? "ration" : "rations"} below reorder point`}
+          </div>
+        </div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="calendar" />Feed runs out in</div>
+          <div className="v num">{mostUrgentFeed ? `${Math.max(0, Math.round(mostUrgentFeed.daysLeft))}d` : "—"}</div>
+          <div className={`d${mostUrgentFeed && mostUrgentFeed.daysLeft <= 7 ? " warn" : ""}`}>
+            {mostUrgentFeed ? mostUrgentFeed.feedType : "No feeding plan tracked yet"}
           </div>
         </div>
         {isManager && (

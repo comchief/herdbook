@@ -1,12 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { getFarmUnit } from "@/lib/gate";
 import { displayToKg, displayCostToKg } from "@/lib/units";
+import { perPigRationTotals } from "@/lib/feed-consumption";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -214,35 +215,101 @@ export async function assignPenFeedAction(formData: FormData) {
   redirect("/app/feed");
 }
 
-export async function logCalendarFeedingAction(formData: FormData) {
-  const session = await requireManagerSession();
-  const rows = JSON.parse(String(formData.get("rows") || "[]")) as { feedType: string; quantityKg: number; costTotal: number }[];
-  const today = new Date();
+/** Pigs belonging to one pen, including the "Unassigned" pseudo-pen the
+ * feeding calendar groups pigs with no pen into (see src/app/app/feed/
+ * page.tsx) — that group has no single literal pen value in the DB, so it
+ * has to be matched as null-or-blank rather than by name. */
+async function pigsInPen(farmId: string, pen: string) {
+  return pen === "Unassigned"
+    ? db.select().from(schema.pigs).where(and(eq(schema.pigs.farmId, farmId), or(isNull(schema.pigs.pen), eq(schema.pigs.pen, ""))))
+    : db.select().from(schema.pigs).where(and(eq(schema.pigs.farmId, farmId), eq(schema.pigs.pen, pen)));
+}
 
-  for (const row of rows) {
-    if (!row.feedType || row.quantityKg <= 0) continue;
-    const [inv] = await db
-      .select()
-      .from(schema.feedInventory)
-      .where(and(eq(schema.feedInventory.farmId, session.farmId), eq(schema.feedInventory.feedType, row.feedType)))
-      .limit(1);
+async function deductInventory(farmId: string, feedType: string, quantityKg: number) {
+  const [inv] = await db
+    .select()
+    .from(schema.feedInventory)
+    .where(and(eq(schema.feedInventory.farmId, farmId), eq(schema.feedInventory.feedType, feedType)))
+    .limit(1);
+  if (inv) {
+    await db
+      .update(schema.feedInventory)
+      .set({ stockKg: Math.max(0, inv.stockKg - quantityKg) })
+      .where(eq(schema.feedInventory.id, inv.id));
+  }
+  return inv;
+}
+
+/** The feeding calendar's "Log feeding" button — confirms feeding actually
+ * happened for one pen and records the usage against inventory. Open to
+ * any signed-in role, including Workers: they're the ones doing the
+ * feeding day to day, and this is a same-day confirmation, not a change to
+ * how the pen is fed (that's still Assign feeding, manager-only).
+ *
+ * Bulk-fed pens (a pen_feed_plans row exists) log the *entire* total in
+ * one go — that's how bulk feeding actually happens, a self-feeder gets
+ * topped up all at once — and resetting startDate to today restarts the
+ * "due again in N days" cycle the feeding calendar and dashboard both read
+ * off of. Per-pig pens log each distinct ration the pen's pigs are on
+ * (usually one, occasionally a "Mixed" pen's few) for just today, and
+ * refuse a second log for the same pen on the same day so double-clicking
+ * doesn't double-deduct inventory. */
+export async function logPenFeedingAction(formData: FormData) {
+  const session = await readSession();
+  if (!session) redirect("/login");
+  const pen = String(formData.get("pen") || "").trim();
+  if (!pen) redirect("/app/feed");
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const [plan] = await db
+    .select()
+    .from(schema.penFeedPlans)
+    .where(and(eq(schema.penFeedPlans.farmId, session.farmId), eq(schema.penFeedPlans.pen, pen)))
+    .limit(1);
+
+  if (plan) {
+    const inv = await deductInventory(session.farmId, plan.feedType, plan.totalWeightKg);
     await db.insert(schema.feedLogs).values({
       farmId: session.farmId,
-      feedType: row.feedType,
+      feedType: plan.feedType,
       direction: "usage",
-      quantityKg: row.quantityKg,
-      costTotal: row.costTotal,
+      quantityKg: plan.totalWeightKg,
+      costTotal: inv ? plan.totalWeightKg * inv.costPerKg : 0,
       date: today,
+      pen,
       source: "calendar",
     });
-    if (inv) {
-      await db
-        .update(schema.feedInventory)
-        .set({ stockKg: Math.max(0, inv.stockKg - row.quantityKg) })
-        .where(eq(schema.feedInventory.id, inv.id));
+    await db.update(schema.penFeedPlans).set({ startDate: today, updatedAt: today }).where(eq(schema.penFeedPlans.id, plan.id));
+  } else {
+    const existingToday = await db
+      .select()
+      .from(schema.feedLogs)
+      .where(and(eq(schema.feedLogs.farmId, session.farmId), eq(schema.feedLogs.pen, pen), eq(schema.feedLogs.source, "calendar")))
+      .then((rows) => rows.some((r) => r.date.toISOString().slice(0, 10) === todayStr));
+    if (existingToday) redirect("/app/feed?error=" + encodeURIComponent("Already logged for this pen today."));
+
+    const pigs = await pigsInPen(session.farmId, pen);
+    const totals = perPigRationTotals(pigs);
+    if (totals.length === 0) redirect("/app/feed?error=" + encodeURIComponent("This pen has no feeding plan to log."));
+
+    for (const { feedType, dailyKg } of totals) {
+      const inv = await deductInventory(session.farmId, feedType, dailyKg);
+      await db.insert(schema.feedLogs).values({
+        farmId: session.farmId,
+        feedType,
+        direction: "usage",
+        quantityKg: dailyKg,
+        costTotal: inv ? dailyKg * inv.costPerKg : 0,
+        date: today,
+        pen,
+        source: "calendar",
+      });
     }
   }
 
   revalidatePath("/app/feed");
-  redirect("/app/feed");
+  revalidatePath("/app");
+  redirect("/app/feed?logged=1");
 }

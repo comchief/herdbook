@@ -8,6 +8,7 @@ import {
   logFeedMovementAction,
   deleteFeedLogAction,
   assignPenFeedAction,
+  logPenFeedingAction,
 } from "@/lib/actions/feed";
 import { Gauge } from "@/components/charts";
 import { fmtDate } from "@/lib/format";
@@ -24,13 +25,23 @@ function fmtDuration(value: number, unit: string) {
   return `${n} ${label}${value === 1 ? "" : "s"}`;
 }
 
-export default async function FeedPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+function daysBetween(a: Date, b: Date) {
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+export default async function FeedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; logged?: string }>;
+}) {
   const session = await requireSession();
   const farm = await requireActiveFarm(session);
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const unitLabel = weightUnitLabel(unit);
-  const { error } = await searchParams;
+  const { error, logged } = await searchParams;
   const isManager = session.role !== "worker";
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
 
   const [inventory, logs, pigs, bulkPlanRows] = await Promise.all([
     db.select().from(schema.feedInventory).where(eq(schema.feedInventory.farmId, session.farmId)),
@@ -52,6 +63,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
       <h1 className="text-2xl font-bold text-ink mb-1">Feed management</h1>
       <p className="text-ink-soft text-sm mb-6">Stock levels, reorder points and consumption.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
+      {logged === "1" && <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">Feeding logged for today.</div>}
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Inventory on hand</h2>
@@ -140,7 +152,8 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                 <th className="num">Pigs on plan</th>
                 <th>Ration(s)</th>
                 <th className="num">Daily total</th>
-                {isManager && <th></th>}
+                <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -150,6 +163,32 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                 const rationNames = [...new Set(onPlan.map((p) => p.feedRation!))];
                 const dailyKg = onPlan.reduce((s, p) => s + (p.dailyFeedKg ?? 0), 0);
                 const bulkDailyKg = plan ? plan.totalWeightKg / Math.max(plan.durationDays, 1) : 0;
+                const hasPlan = plan || onPlan.length > 0;
+
+                let statusBadge: React.ReactNode = null;
+                if (plan) {
+                  const daysLeft = plan.durationDays - daysBetween(plan.startDate, today);
+                  statusBadge =
+                    daysLeft > 0 ? (
+                      <span className="badge badge-good">Due in {daysLeft}d</span>
+                    ) : daysLeft === 0 ? (
+                      <span className="badge badge-warn">Due today</span>
+                    ) : (
+                      <span className="badge badge-critical">Overdue by {Math.abs(daysLeft)}d</span>
+                    );
+                } else if (onPlan.length > 0) {
+                  const loggedToday = logs.some(
+                    (l) => l.pen === penName && l.source === "calendar" && l.date.toISOString().slice(0, 10) === todayStr
+                  );
+                  statusBadge = loggedToday ? (
+                    <span className="badge badge-good">Logged today</span>
+                  ) : (
+                    <span className="badge badge-warn">Not logged</span>
+                  );
+                } else {
+                  statusBadge = <span className="text-muted">—</span>;
+                }
+
                 return (
                   <tr key={penName}>
                     <td className="font-semibold">{penName}</td>
@@ -175,9 +214,18 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                         fmtWeight(dailyKg, unit)
                       )}
                     </td>
-                    {isManager && (
-                      <td className="text-right">
-                        <details className="relative inline-block">
+                    <td>{statusBadge}</td>
+                    <td className="text-right whitespace-nowrap">
+                      {hasPlan && (
+                        <form action={logPenFeedingAction} className="inline">
+                          <input type="hidden" name="pen" value={penName} />
+                          <button type="submit" className="btn btn-small btn-primary">
+                            Log feeding
+                          </button>
+                        </form>
+                      )}
+                      {isManager && (
+                        <details className="relative inline-block ml-2">
                           <summary className="btn btn-small cursor-pointer list-none">{plan ? "Edit feeding" : "Assign feeding"}</summary>
                           <form
                             action={assignPenFeedAction}
@@ -201,14 +249,14 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
                             </button>
                           </form>
                         </details>
-                      </td>
-                    )}
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {pens.size === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center text-muted py-8">
+                  <td colSpan={6} className="text-center text-muted py-8">
                     No pigs yet — add pigs to a pen first.
                   </td>
                 </tr>
