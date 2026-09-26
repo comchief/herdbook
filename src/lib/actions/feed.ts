@@ -132,24 +132,82 @@ export async function deleteFeedLogAction(formData: FormData) {
   redirect("/app/feed");
 }
 
-/** Assigns a ration + daily amount to every pig in a pen — powers the
- * feeding calendar. Manager/owner only; Workers can view the calendar but
- * not edit assignments. */
+const DURATION_UNIT_DAYS: Record<string, number> = { days: 1, weeks: 7, months: 30.44 };
+
+/** Assigns feeding for a whole pen — either per-pig daily amounts (powers
+ * the feeding calendar's per-pig sum) or a single bulk/ad-lib allowance for
+ * the pen as a whole (a pen_feed_plans row; see schema.ts). Manager/owner
+ * only; Workers can view the calendar but not edit assignments.
+ *
+ * The two modes are mutually exclusive per pen: saving "bulk" clears every
+ * pig in the pen's own feedRation/dailyFeedKg (so switching back to
+ * per-pig later starts from a blank slate instead of silently reusing
+ * whatever was set before bulk feeding began), and saving "per-pig" deletes
+ * any existing bulk plan for that pen (so it stops being treated as
+ * bulk-fed). */
 export async function assignPenFeedAction(formData: FormData) {
   const session = await requireManagerSession();
+  const pen = str(formData, "pen");
+  const mode = str(formData, "mode") === "bulk" ? "bulk" : "per-pig";
   const pigIds = formData.getAll("pigId").map(String);
-  const rations = formData.getAll("feedRation").map(String);
-  const amounts = formData.getAll("dailyFeedKg").map(String);
   const unit = await getFarmUnit(session.farmId);
 
-  for (let i = 0; i < pigIds.length; i++) {
-    const ration = rations[i]?.trim() || null;
-    const rawAmount = amounts[i] === "" || amounts[i] == null ? null : Number(amounts[i]);
-    const amount = rawAmount !== null && Number.isFinite(rawAmount) ? displayToKg(rawAmount, unit) : null;
+  if (mode === "bulk") {
+    const feedType = str(formData, "bulkFeedType");
+    const totalWeight = num(formData, "bulkTotalWeight");
+    const durationValue = num(formData, "bulkDurationValue");
+    const durationUnit = str(formData, "bulkDurationUnit");
+    const daysPerUnit = DURATION_UNIT_DAYS[durationUnit] ?? 1;
+    if (!feedType || totalWeight <= 0 || durationValue <= 0) {
+      redirect("/app/feed?error=" + encodeURIComponent("Ration, total weight and a duration are required for bulk feeding."));
+    }
+
     await db
-      .update(schema.pigs)
-      .set({ feedRation: ration, dailyFeedKg: amount })
-      .where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.id, pigIds[i])));
+      .insert(schema.penFeedPlans)
+      .values({
+        farmId: session.farmId,
+        pen,
+        feedType,
+        totalWeightKg: displayToKg(totalWeight, unit),
+        durationValue,
+        durationUnit,
+        durationDays: durationValue * daysPerUnit,
+        startDate: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [schema.penFeedPlans.farmId, schema.penFeedPlans.pen],
+        set: {
+          feedType,
+          totalWeightKg: displayToKg(totalWeight, unit),
+          durationValue,
+          durationUnit,
+          durationDays: durationValue * daysPerUnit,
+          startDate: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+    for (const pigId of pigIds) {
+      await db
+        .update(schema.pigs)
+        .set({ feedRation: null, dailyFeedKg: null })
+        .where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.id, pigId)));
+    }
+  } else {
+    const rations = formData.getAll("feedRation").map(String);
+    const amounts = formData.getAll("dailyFeedKg").map(String);
+
+    for (let i = 0; i < pigIds.length; i++) {
+      const ration = rations[i]?.trim() || null;
+      const rawAmount = amounts[i] === "" || amounts[i] == null ? null : Number(amounts[i]);
+      const amount = rawAmount !== null && Number.isFinite(rawAmount) ? displayToKg(rawAmount, unit) : null;
+      await db
+        .update(schema.pigs)
+        .set({ feedRation: ration, dailyFeedKg: amount })
+        .where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.id, pigIds[i])));
+    }
+
+    await db.delete(schema.penFeedPlans).where(and(eq(schema.penFeedPlans.farmId, session.farmId), eq(schema.penFeedPlans.pen, pen)));
   }
 
   revalidatePath("/app/feed");

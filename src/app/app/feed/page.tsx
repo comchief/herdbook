@@ -12,6 +12,17 @@ import {
 import { Gauge } from "@/components/charts";
 import { fmtDate } from "@/lib/format";
 import { displayValue, weightUnitLabel, fmtWeight, kgCostToDisplay } from "@/lib/units";
+import { PenFeedFields } from "@/components/pen-feed-fields";
+
+/** Renders a stored duration (e.g. `{ value: 2, unit: "weeks" }`) back the
+ * way it was entered — "2 weeks", "1 month" — rather than as the days it
+ * was converted to for the daily-rate math (see DURATION_UNIT_DAYS in
+ * src/lib/actions/feed.ts). */
+function fmtDuration(value: number, unit: string) {
+  const n = value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
+  const label = unit === "months" ? "month" : unit === "weeks" ? "week" : "day";
+  return `${n} ${label}${value === 1 ? "" : "s"}`;
+}
 
 export default async function FeedPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireSession();
@@ -21,10 +32,11 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
   const { error } = await searchParams;
   const isManager = session.role !== "worker";
 
-  const [inventory, logs, pigs] = await Promise.all([
+  const [inventory, logs, pigs, bulkPlanRows] = await Promise.all([
     db.select().from(schema.feedInventory).where(eq(schema.feedInventory.farmId, session.farmId)),
     db.select().from(schema.feedLogs).where(eq(schema.feedLogs.farmId, session.farmId)).orderBy(desc(schema.feedLogs.date)),
     db.select().from(schema.pigs).where(eq(schema.pigs.farmId, session.farmId)),
+    db.select().from(schema.penFeedPlans).where(eq(schema.penFeedPlans.farmId, session.farmId)),
   ]);
 
   const pens = new Map<string, typeof pigs>();
@@ -33,6 +45,7 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
     if (!pens.has(pen)) pens.set(pen, []);
     pens.get(pen)!.push(p);
   }
+  const bulkPlans = new Map(bulkPlanRows.map((p) => [p.pen, p]));
 
   return (
     <div>
@@ -116,7 +129,9 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-1">Feeding calendar</h2>
-        <p className="text-xs text-muted mb-3">Daily amount per pen, rolled up from each pig&apos;s feeding plan.</p>
+        <p className="text-xs text-muted mb-3">
+          Daily amount per pen — rolled up from each pig&apos;s feeding plan, or a bulk (ad-lib) allowance for the whole pen.
+        </p>
         <div className="overflow-x-auto">
           <table className="data">
             <thead>
@@ -130,47 +145,59 @@ export default async function FeedPage({ searchParams }: { searchParams: Promise
             </thead>
             <tbody>
               {[...pens.entries()].map(([penName, penPigs]) => {
+                const plan = bulkPlans.get(penName);
                 const onPlan = penPigs.filter((p) => p.feedRation && (p.dailyFeedKg ?? 0) > 0);
                 const rationNames = [...new Set(onPlan.map((p) => p.feedRation!))];
                 const dailyKg = onPlan.reduce((s, p) => s + (p.dailyFeedKg ?? 0), 0);
+                const bulkDailyKg = plan ? plan.totalWeightKg / Math.max(plan.durationDays, 1) : 0;
                 return (
                   <tr key={penName}>
                     <td className="font-semibold">{penName}</td>
                     <td className="num">
-                      {onPlan.length} / {penPigs.length}
+                      {plan ? (
+                        <span className="badge badge-info">Bulk · {penPigs.length}</span>
+                      ) : (
+                        `${onPlan.length} / ${penPigs.length}`
+                      )}
                     </td>
-                    <td>{rationNames.length === 0 ? "—" : rationNames.length === 1 ? rationNames[0] : "Mixed"}</td>
-                    <td className="num">{fmtWeight(dailyKg, unit)}</td>
+                    <td>{plan ? plan.feedType : rationNames.length === 0 ? "—" : rationNames.length === 1 ? rationNames[0] : "Mixed"}</td>
+                    <td className="num">
+                      {plan ? (
+                        <>
+                          <div>
+                            {fmtWeight(bulkDailyKg, unit)} <span className="text-muted font-normal">avg</span>
+                          </div>
+                          <div className="text-[11px] text-muted">
+                            {fmtWeight(plan.totalWeightKg, unit, 0)} / {fmtDuration(plan.durationValue, plan.durationUnit)}
+                          </div>
+                        </>
+                      ) : (
+                        fmtWeight(dailyKg, unit)
+                      )}
+                    </td>
                     {isManager && (
                       <td className="text-right">
                         <details className="relative inline-block">
-                          <summary className="btn btn-small cursor-pointer list-none">Assign feeding</summary>
+                          <summary className="btn btn-small cursor-pointer list-none">{plan ? "Edit feeding" : "Assign feeding"}</summary>
                           <form
                             action={assignPenFeedAction}
-                            className="card p-4 absolute right-0 z-10 w-80 mt-2 space-y-2 text-left max-h-80 overflow-y-auto"
+                            className="card p-4 absolute right-0 z-10 w-80 mt-2 space-y-2 text-left max-h-[28rem] overflow-y-auto"
                           >
-                            {penPigs.map((p) => (
-                              <div key={p.id} className="flex gap-2 items-end border-b border-border pb-2 last:border-b-0">
-                                <input type="hidden" name="pigId" value={p.id} />
-                                <div className="field flex-1">
-                                  <label>{p.name}</label>
-                                  <select name="feedRation" defaultValue={p.feedRation ?? ""}>
-                                    <option value="">—</option>
-                                    {inventory.map((f) => (
-                                      <option key={f.id} value={f.feedType}>
-                                        {f.feedType}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div className="field w-24">
-                                  <label>{unitLabel}/day</label>
-                                  <input type="number" step="0.1" min="0" name="dailyFeedKg" defaultValue={displayValue(p.dailyFeedKg, unit)} />
-                                </div>
-                              </div>
-                            ))}
+                            <input type="hidden" name="pen" value={penName} />
+                            <PenFeedFields
+                              pigs={penPigs}
+                              rations={inventory}
+                              unit={unit}
+                              defaultMode={plan ? "bulk" : "per-pig"}
+                              defaultBulk={{
+                                feedType: plan?.feedType ?? "",
+                                totalWeightKg: plan?.totalWeightKg ?? null,
+                                durationValue: plan?.durationValue ?? null,
+                                durationUnit: plan?.durationUnit ?? "weeks",
+                              }}
+                            />
                             <button type="submit" className="btn btn-primary btn-small w-full justify-center">
-                              Save assignments
+                              Save feeding
                             </button>
                           </form>
                         </details>

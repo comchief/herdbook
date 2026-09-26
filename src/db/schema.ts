@@ -224,6 +224,38 @@ export const feedLogs = pgTable(
   (t) => [index("feedlog_farm_idx").on(t.farmId)]
 );
 
+/** A pen fed "bulk" (ad-lib / unlimited) rather than by per-pig daily
+ * amounts — e.g. self-feeders topped up periodically rather than
+ * individually rationed. One row per (farmId, pen); its presence is what
+ * marks that pen as bulk-fed (see the feed management page's "Assign
+ * feeding" form, src/lib/actions/feed.ts's assignPenFeedAction). Unlike
+ * per-pig feeding (pigs.feedRation/dailyFeedKg), the total is for the
+ * whole pen, not per pig — durationDays is derived from
+ * durationValue/durationUnit at save time (weeks × 7, months × 30.44,
+ * matching the day-conversions used elsewhere in the app) so the feeding
+ * calendar can show a daily-equivalent without redoing that math on every
+ * render, while durationValue/durationUnit are kept as entered so the UI
+ * can redisplay "2 weeks" rather than a conversion of it. */
+export const penFeedPlans = pgTable(
+  "pen_feed_plans",
+  {
+    id: id(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id, { onDelete: "cascade" }),
+    pen: text("pen").notNull(),
+    feedType: text("feed_type").notNull(),
+    totalWeightKg: doublePrecision("total_weight_kg").notNull(),
+    durationValue: doublePrecision("duration_value").notNull(),
+    durationUnit: text("duration_unit").notNull().default("days"), // "days" | "weeks" | "months"
+    durationDays: doublePrecision("duration_days").notNull(),
+    startDate: timestamp("start_date").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("penfeed_farm_pen_idx").on(t.farmId, t.pen), index("penfeed_farm_idx").on(t.farmId)]
+);
+
 export const sales = pgTable(
   "sales",
   {
