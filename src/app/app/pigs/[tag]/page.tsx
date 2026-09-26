@@ -11,7 +11,7 @@ import { STAGE_LABEL } from "@/lib/growth-rules";
 import { getGrowthStageRules } from "@/lib/growth-rules-db";
 import { syncPigStageAction } from "@/lib/actions/pigs";
 import { fmtDate, fmtDateShort } from "@/lib/format";
-import { kgToDisplay, weightUnitLabel, fmtWeight } from "@/lib/units";
+import { kgToDisplay, weightUnitLabel, fmtWeight, fmtWeightDelta } from "@/lib/units";
 import { classifySex } from "@/lib/pig-classification";
 
 const STATUS_STYLE: Record<string, { cls: string; label: string }> = {
@@ -76,6 +76,13 @@ export default async function PigProfilePage({
     label: fmtDateShort(new Date(e.date)),
     value: kgToDisplay(e.weightKg, unit),
   }));
+  // Most-recent-first log of each weigh-in against the one before it, so
+  // the profile shows exactly what changed and by how much whenever a new
+  // weight is recorded (via the edit form) — the chart above shows the
+  // trend, this shows the actual entries it's built from.
+  const weightLogRows = weightLog
+    .map((entry, i) => ({ ...entry, prevWeightKg: i > 0 ? weightLog[i - 1].weightKg : null }))
+    .reverse();
 
   const ageText = pig!.dob ? ageLabel(pig!.dob) : pig!.acquiredDate ? `${ageLabel(pig!.acquiredDate)}*` : "—";
 
@@ -284,6 +291,34 @@ export default async function PigProfilePage({
           <span className="text-[11.5px] text-muted">from recorded weigh-ins</span>
         </div>
         <LineChart points={weightPoints} valueFormat={(n) => `${n.toFixed(1)} ${unitLabel}`} />
+        {weightLogRows.length > 0 && (
+          <div className="mt-4 pt-1 border-t border-border flex flex-col">
+            {weightLogRows.map((entry, i) => {
+              const deltaKg = entry.prevWeightKg !== null ? entry.weightKg - entry.prevWeightKg : null;
+              return (
+                <div key={`${entry.date}-${i}`} className="flex items-center justify-between gap-3 py-2.5 border-t border-border first:border-t-0 text-sm">
+                  <span className="text-xs text-muted num shrink-0">{fmtDate(new Date(entry.date))}</span>
+                  <span className="font-semibold num text-right flex-1 truncate">
+                    {entry.prevWeightKg !== null ? (
+                      <>
+                        {fmtWeight(entry.prevWeightKg, unit)} <span className="text-muted font-normal">→</span> {fmtWeight(entry.weightKg, unit)}
+                      </>
+                    ) : (
+                      fmtWeight(entry.weightKg, unit)
+                    )}
+                  </span>
+                  <span
+                    className={`text-xs font-semibold num shrink-0 w-[92px] text-right ${
+                      deltaKg === null || deltaKg === 0 ? "text-muted" : deltaKg > 0 ? "text-good" : "text-critical"
+                    }`}
+                  >
+                    {deltaKg === null ? "First weigh-in" : fmtWeightDelta(deltaKg, unit)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {recentMedical.length > 0 && (

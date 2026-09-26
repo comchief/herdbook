@@ -48,3 +48,13 @@ export function displayValue(kg: number | null | undefined, unit: WeightUnit, de
   if (kg === null || kg === undefined) return "";
   return kgToDisplay(kg, unit).toFixed(decimals);
 }
+
+/** Formats a weight *change* (this weigh-in minus the previous one) in the
+ * farm's unit, always signed — e.g. "+2.3 kg", "-1.1 lb", "0.0 kg". Used on
+ * the pig profile's weight log (see src/app/app/pigs/[tag]/page.tsx), where
+ * the sign is the point: it's what tells a gain from a loss at a glance. */
+export function fmtWeightDelta(deltaKg: number, unit: WeightUnit, decimals = 1): string {
+  const d = kgToDisplay(deltaKg, unit);
+  const sign = d > 0 ? "+" : "";
+  return `${sign}${d.toFixed(decimals)} ${weightUnitLabel(unit)}`;
+}
