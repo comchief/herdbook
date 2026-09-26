@@ -42,7 +42,7 @@ export async function GET() {
   const readyForFinishing = pigs.filter(
     (p) => ["grower", "finisher"].includes(p.status) && p.currentWeightKg >= growthRules.finisher.endWeightMinKg
   ).length;
-  const rationsBelowReorder = feedInventory.filter((f) => f.stockKg < f.reorderLevelKg).length;
+  const rationsBelowReorder = feedInventory.filter((f) => f.stockKg <= f.reorderLevelKg).length;
 
   const today = new Date();
   const ym = today.toISOString().slice(0, 7);

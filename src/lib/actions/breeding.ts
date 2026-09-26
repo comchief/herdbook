@@ -7,6 +7,8 @@ import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { getFarmUnit } from "@/lib/gate";
 import { displayToKg } from "@/lib/units";
+import { logActivity } from "@/lib/activity";
+import { fmtDate } from "@/lib/format";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -64,6 +66,13 @@ export async function createBreedingAction(formData: FormData) {
       .where(eq(schema.pigs.id, sow.id));
   }
 
+  await logActivity(
+    session,
+    "Recorded mating",
+    `${sow?.name ?? sowTag} (${sowTag})${boarTag ? ` × ${boar?.name ?? boarTag} (${boarTag})` : ""} — expected farrow ${fmtDate(new Date(expectedFarrowDate))}`,
+    "/app/breeding"
+  );
+
   revalidatePath("/app/breeding");
   revalidatePath("/app");
   redirect("/app/breeding");
@@ -102,6 +111,13 @@ export async function logFarrowOutcomeAction(formData: FormData) {
     })
     .where(eq(schema.breedingRecords.id, breedingId));
 
+  await logActivity(
+    session,
+    "Logged farrowing outcome",
+    `${record.sowName ?? record.sowTag} (${record.sowTag})${litterSize !== null ? ` — litter of ${litterSize}` : ""}`,
+    "/app/breeding"
+  );
+
   revalidatePath("/app/breeding");
   revalidatePath("/app");
   redirect("/app/breeding");
@@ -112,7 +128,15 @@ export async function deleteBreedingAction(formData: FormData) {
   if (!session) redirect("/login");
   if (session.role === "worker") redirect("/app/breeding");
   const id = str(formData, "id");
+  const [record] = await db
+    .select()
+    .from(schema.breedingRecords)
+    .where(and(eq(schema.breedingRecords.farmId, session.farmId), eq(schema.breedingRecords.id, id)))
+    .limit(1);
   await db.delete(schema.breedingRecords).where(and(eq(schema.breedingRecords.farmId, session.farmId), eq(schema.breedingRecords.id, id)));
+  if (record) {
+    await logActivity(session, "Deleted breeding record", `${record.sowName ?? record.sowTag} (${record.sowTag})`, "/app/breeding");
+  }
   revalidatePath("/app/breeding");
   redirect("/app/breeding");
 }

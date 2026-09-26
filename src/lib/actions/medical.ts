@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -53,6 +54,15 @@ export async function createMedicalAction(formData: FormData) {
     nextDueDate: nextDueDate ? new Date(nextDueDate) : null,
   });
 
+  await logActivity(
+    session,
+    "Logged medical record",
+    type === "medication"
+      ? `Administered ${medicationName} to ${pig?.name ?? pigTag} (${pigTag})`
+      : `${type[0].toUpperCase()}${type.slice(1)} for ${pig?.name ?? pigTag} (${pigTag}) — ${description}`,
+    "/app/medical"
+  );
+
   revalidatePath("/app/medical");
   revalidatePath("/app");
   redirect("/app/medical");
@@ -64,10 +74,18 @@ export async function dismissFollowupAction(formData: FormData) {
   const session = await readSession();
   if (!session) redirect("/login");
   const id = str(formData, "id");
+  const [record] = await db
+    .select()
+    .from(schema.medicalRecords)
+    .where(and(eq(schema.medicalRecords.farmId, session.farmId), eq(schema.medicalRecords.id, id)))
+    .limit(1);
   await db
     .update(schema.medicalRecords)
     .set({ nextDueDate: null })
     .where(and(eq(schema.medicalRecords.farmId, session.farmId), eq(schema.medicalRecords.id, id)));
+  if (record) {
+    await logActivity(session, "Dismissed follow-up", `${record.pigName ?? record.pigTag} — ${record.type}`, "/app/medical");
+  }
   revalidatePath("/app/medical");
   revalidatePath("/app");
   redirect("/app/medical");
@@ -78,7 +96,15 @@ export async function deleteMedicalAction(formData: FormData) {
   if (!session) redirect("/login");
   if (session.role === "worker") redirect("/app/medical");
   const id = str(formData, "id");
+  const [record] = await db
+    .select()
+    .from(schema.medicalRecords)
+    .where(and(eq(schema.medicalRecords.farmId, session.farmId), eq(schema.medicalRecords.id, id)))
+    .limit(1);
   await db.delete(schema.medicalRecords).where(and(eq(schema.medicalRecords.farmId, session.farmId), eq(schema.medicalRecords.id, id)));
+  if (record) {
+    await logActivity(session, "Deleted medical record", `${record.pigName ?? record.pigTag} — ${record.type}`, "/app/medical");
+  }
   revalidatePath("/app/medical");
   redirect("/app/medical");
 }

@@ -337,6 +337,39 @@ export const platformBankDetails = pgTable("platform_bank_details", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+/** One row per farm-data write a signed-in user makes — the source for the
+ * "activity" page an owner opens from a team member's card (see
+ * src/app/app/team/[userId]/page.tsx). Written by src/lib/activity.ts's
+ * logActivity(), called from the server actions after their write
+ * succeeds; it never blocks or fails the action it's describing.
+ *
+ * userName is denormalized (like pigName/boarName elsewhere) so a log
+ * entry still reads correctly after that person is renamed or removed
+ * from the farm — userId is kept too, set null on removal (rather than
+ * cascading the delete), so the activity page can still be reached by id
+ * for whoever's left, but a removed user's own history isn't deleted
+ * along with their account. */
+export const activityLog = pgTable(
+  "activity_log",
+  {
+    id: id(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    userName: text("user_name").notNull(),
+    action: text("action").notNull(), // short verb phrase, e.g. "Logged medical record"
+    detail: text("detail").notNull(), // one-line human-readable description
+    href: text("href"), // optional deep link back to the relevant page/record
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("activity_farm_idx").on(t.farmId),
+    index("activity_user_idx").on(t.userId),
+    index("activity_farm_created_idx").on(t.farmId, t.createdAt),
+  ]
+);
+
 /** Platform-wide growth-stage rules (Piglet/Weaner/Grower/Finisher), edited
  * by the Herdbook operator from the platform admin screen — see
  * src/lib/growth-rules.ts. One row per stage, keyed by stage name so an

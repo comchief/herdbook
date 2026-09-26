@@ -18,3 +18,16 @@ export function fmtDateShort(d: Date | null | undefined, fallback = "—") {
   if (!d) return fallback;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 }
+
+/** Formats an actual moment in time (e.g. an activity-log entry's
+ * createdAt) — unlike fmtDate above, which intentionally pins
+ * calendar-only dates to UTC, this is a real instant, so a timezone
+ * genuinely applies. Pass the farm's own timezone (same one localHour in
+ * weather.ts reads) to show it in local farm time; omitted, it falls back
+ * to the rendering environment's default. */
+export function fmtDateTime(d: Date | null | undefined, timezone?: string | null, fallback = "—") {
+  if (!d) return fallback;
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" };
+  if (timezone) opts.timeZone = timezone;
+  return d.toLocaleString(undefined, opts);
+}

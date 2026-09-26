@@ -28,3 +28,11 @@ export async function getFarmUnit(farmId: string): Promise<"kg" | "lbs"> {
   const [farm] = await db.select({ unit: schema.farms.unit }).from(schema.farms).where(eq(schema.farms.id, farmId)).limit(1);
   return farm?.unit === "lbs" ? "lbs" : "kg";
 }
+
+/** Same idea as getFarmUnit, for actions that just need the farm's
+ * currency (e.g. to format a money figure in an activity-log line)
+ * without loading the whole farm record. */
+export async function getFarmCurrency(farmId: string): Promise<string> {
+  const [farm] = await db.select({ currency: schema.farms.currency }).from(schema.farms).where(eq(schema.farms.id, farmId)).limit(1);
+  return farm?.currency ?? "USD";
+}

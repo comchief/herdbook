@@ -8,6 +8,7 @@ import { setSessionCookie, clearSessionCookie, readSession } from "@/lib/session
 import { TRIAL_DAYS } from "@/lib/subscription";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_BREEDS } from "@/lib/breeds";
+import { logActivity } from "@/lib/activity";
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB — plenty for a profile photo, small enough to store inline
 
@@ -229,6 +230,8 @@ export async function createTeamMemberAction(formData: FormData) {
     isPlatformAdmin: false,
   });
 
+  await logActivity(session, "Added team member", `${name} — ${role}`, "/app/team");
+
   redirect("/app/team");
 }
 
@@ -242,5 +245,6 @@ export async function removeTeamMemberAction(formData: FormData) {
   if (!target || target.farmId !== session.farmId) redirect("/app/team");
 
   await db.delete(schema.users).where(eq(schema.users.id, userId));
+  await logActivity(session, "Removed team member", `${target.name} — ${target.role}`, "/app/team");
   redirect("/app/team");
 }

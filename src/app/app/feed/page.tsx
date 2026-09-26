@@ -70,9 +70,10 @@ export default async function FeedPage({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
           {inventory.map((f) => {
             const ceiling = Math.max(f.reorderLevelKg * 2.5, f.stockKg, 1);
-            const tone = f.stockKg < f.reorderLevelKg ? "critical" : f.stockKg < f.reorderLevelKg * 1.5 ? "warn" : "good";
+            const atReorder = f.stockKg <= f.reorderLevelKg;
+            const tone = atReorder ? "critical" : f.stockKg < f.reorderLevelKg * 1.5 ? "warn" : "good";
             return (
-              <div key={f.id} className="flex items-start gap-2">
+              <div key={f.id} className={`flex items-start gap-2 rounded-lg px-2 -mx-2 ${atReorder ? "bg-critical-soft" : ""}`}>
                 <div className="flex-1 min-w-0">
                   <Gauge
                     label={f.feedType}

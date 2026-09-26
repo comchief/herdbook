@@ -33,7 +33,7 @@ export async function needsAttentionCount(farmId: string): Promise<number> {
     if ((m.nextDueDate.getTime() - now) / 86400000 <= 14) count++;
   }
   for (const f of feed) {
-    if (f.stockKg < f.reorderLevelKg) count++;
+    if (f.stockKg <= f.reorderLevelKg) count++;
   }
   for (const p of pigs) {
     const g = growthStatus(p, rules);

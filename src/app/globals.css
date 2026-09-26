@@ -19,6 +19,7 @@
   --good: #16a34a;
   --warn: #d97706;
   --critical: #dc2626;
+  --critical-soft: #fbdada;
   --info: #2563eb;
 }
 
@@ -37,6 +38,7 @@
   --color-good: var(--good);
   --color-warn: var(--warn);
   --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
   --color-info: var(--info);
   --font-display: var(--font-display);
   --font-sans: var(--font-body);
@@ -113,6 +115,15 @@ h1, h2, h3 {
 .stat-tile .d { font-size: 12px; margin-top: 5px; color: var(--ink-soft); }
 .stat-tile .d.warn { color: var(--warn); font-weight: 600; }
 .stat-tile .d.critical { color: var(--critical); font-weight: 600; }
+
+/* A stat tile (or any card) that's hit a critical threshold — e.g. a
+ * ration at or below its reorder level — turns fully red rather than just
+ * tinting a line of text, so it reads as urgent at a glance. */
+.card.critical, .stat-tile.critical {
+  background: var(--critical-soft);
+  border-color: #f6c2c2;
+}
+.stat-tile.critical .d { color: #7f1d1d; }
 
 /* ---------- Charts: donut ---------- */
 .donut-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }

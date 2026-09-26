@@ -6,8 +6,9 @@ import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { getFarmUnit } from "@/lib/gate";
-import { displayToKg, displayCostToKg } from "@/lib/units";
+import { displayToKg, displayCostToKg, fmtWeight } from "@/lib/units";
 import { perPigRationTotals } from "@/lib/feed-consumption";
+import { logActivity } from "@/lib/activity";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -37,13 +38,15 @@ export async function createRationAction(formData: FormData) {
   if (clash) redirect("/app/feed?error=" + encodeURIComponent("That ration already exists."));
 
   const unit = await getFarmUnit(session.farmId);
+  const stockKg = displayToKg(num(formData, "stockKg"), unit);
   await db.insert(schema.feedInventory).values({
     farmId: session.farmId,
     feedType,
-    stockKg: displayToKg(num(formData, "stockKg"), unit),
+    stockKg,
     reorderLevelKg: displayToKg(num(formData, "reorderLevelKg"), unit),
     costPerKg: displayCostToKg(num(formData, "costPerKg"), unit),
   });
+  await logActivity(session, "Added feed ration", `${feedType} — starting stock ${fmtWeight(stockKg, unit, 0)}`, "/app/feed");
   revalidatePath("/app/feed");
   redirect("/app/feed");
 }
@@ -52,14 +55,29 @@ export async function updateRationAction(formData: FormData) {
   const session = await requireManagerSession();
   const id = str(formData, "id");
   const unit = await getFarmUnit(session.farmId);
+  const [existing] = await db
+    .select()
+    .from(schema.feedInventory)
+    .where(and(eq(schema.feedInventory.farmId, session.farmId), eq(schema.feedInventory.id, id)))
+    .limit(1);
+  const stockKg = displayToKg(num(formData, "stockKg"), unit);
+  const reorderLevelKg = displayToKg(num(formData, "reorderLevelKg"), unit);
   await db
     .update(schema.feedInventory)
     .set({
-      stockKg: displayToKg(num(formData, "stockKg"), unit),
-      reorderLevelKg: displayToKg(num(formData, "reorderLevelKg"), unit),
+      stockKg,
+      reorderLevelKg,
       costPerKg: displayCostToKg(num(formData, "costPerKg"), unit),
     })
     .where(and(eq(schema.feedInventory.farmId, session.farmId), eq(schema.feedInventory.id, id)));
+  if (existing) {
+    await logActivity(
+      session,
+      "Updated feed ration",
+      `${existing.feedType} — stock ${fmtWeight(stockKg, unit, 0)}, reorder at ${fmtWeight(reorderLevelKg, unit, 0)}`,
+      "/app/feed"
+    );
+  }
   revalidatePath("/app/feed");
   redirect("/app/feed");
 }
@@ -98,6 +116,13 @@ export async function logFeedMovementAction(formData: FormData) {
       .where(eq(schema.feedInventory.id, inv.id));
   }
 
+  await logActivity(
+    session,
+    "Logged feed movement",
+    `${direction === "purchase" ? "Purchased" : "Used"} ${fmtWeight(quantityKg, unit, 0)} of ${feedType}`,
+    "/app/feed"
+  );
+
   revalidatePath("/app/feed");
   revalidatePath("/app");
   redirect("/app/feed");
@@ -109,6 +134,7 @@ export async function logFeedMovementAction(formData: FormData) {
 export async function deleteFeedLogAction(formData: FormData) {
   const session = await requireManagerSession();
   const id = str(formData, "id");
+  const unit = await getFarmUnit(session.farmId);
   const [log] = await db
     .select()
     .from(schema.feedLogs)
@@ -128,6 +154,7 @@ export async function deleteFeedLogAction(formData: FormData) {
         .where(eq(schema.feedInventory.id, inv.id));
     }
     await db.delete(schema.feedLogs).where(eq(schema.feedLogs.id, id));
+    await logActivity(session, "Deleted feed movement", `${log.direction === "purchase" ? "Purchase" : "Usage"} of ${fmtWeight(log.quantityKg, unit, 0)} ${log.feedType}`, "/app/feed");
   }
   revalidatePath("/app/feed");
   redirect("/app/feed");
@@ -194,6 +221,13 @@ export async function assignPenFeedAction(formData: FormData) {
         .set({ feedRation: null, dailyFeedKg: null })
         .where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.id, pigId)));
     }
+
+    await logActivity(
+      session,
+      "Assigned bulk feeding",
+      `${pen} — ${feedType}, ${fmtWeight(displayToKg(totalWeight, unit), unit, 0)} every ${durationValue % 1 === 0 ? durationValue.toFixed(0) : durationValue.toFixed(1)} ${durationUnit}`,
+      "/app/feed"
+    );
   } else {
     const rations = formData.getAll("feedRation").map(String);
     const amounts = formData.getAll("dailyFeedKg").map(String);
@@ -209,6 +243,8 @@ export async function assignPenFeedAction(formData: FormData) {
     }
 
     await db.delete(schema.penFeedPlans).where(and(eq(schema.penFeedPlans.farmId, session.farmId), eq(schema.penFeedPlans.pen, pen)));
+
+    await logActivity(session, "Assigned per-pig feeding", `${pen} — ${pigIds.length} pig${pigIds.length === 1 ? "" : "s"}`, "/app/feed");
   }
 
   revalidatePath("/app/feed");
@@ -263,6 +299,8 @@ export async function logPenFeedingAction(formData: FormData) {
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
+  const unit = await getFarmUnit(session.farmId);
+
   const [plan] = await db
     .select()
     .from(schema.penFeedPlans)
@@ -282,6 +320,7 @@ export async function logPenFeedingAction(formData: FormData) {
       source: "calendar",
     });
     await db.update(schema.penFeedPlans).set({ startDate: today, updatedAt: today }).where(eq(schema.penFeedPlans.id, plan.id));
+    await logActivity(session, "Logged feeding", `${pen} — topped up ${fmtWeight(plan.totalWeightKg, unit, 0)} of ${plan.feedType} (bulk)`, "/app/feed");
   } else {
     const existingToday = await db
       .select()
@@ -307,6 +346,13 @@ export async function logPenFeedingAction(formData: FormData) {
         source: "calendar",
       });
     }
+
+    await logActivity(
+      session,
+      "Logged feeding",
+      `${pen} — ${totals.map((t) => `${fmtWeight(t.dailyKg, unit, 0)} ${t.feedType}`).join(", ")}`,
+      "/app/feed"
+    );
   }
 
   revalidatePath("/app/feed");

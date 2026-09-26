@@ -5,8 +5,10 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
-import { getFarmUnit } from "@/lib/gate";
+import { getFarmUnit, getFarmCurrency } from "@/lib/gate";
 import { displayToKg, displayCostToKg } from "@/lib/units";
+import { logActivity } from "@/lib/activity";
+import { fmtMoney } from "@/lib/currency";
 
 function str(fd: FormData, key: string) {
   return String(fd.get(key) || "").trim();
@@ -44,17 +46,27 @@ export async function createSaleAction(formData: FormData) {
   const carcassWeightKg = carcassWeightInput === null ? null : displayToKg(carcassWeightInput, unit);
   const pricePerKg = displayCostToKg(pricePerUnit, unit);
 
+  const pigTag = str(formData, "pigTag") || null;
+  const channel = str(formData, "channel") || "live";
   await db.insert(schema.sales).values({
     farmId: session.farmId,
     date: new Date(date),
-    pigTag: str(formData, "pigTag") || null,
-    channel: str(formData, "channel") || "live",
+    pigTag,
+    channel,
     liveWeightKg,
     carcassWeightKg,
     pricePerUnit: pricePerKg,
     revenue,
     buyer: str(formData, "buyer") || null,
   });
+
+  const currency = await getFarmCurrency(session.farmId);
+  await logActivity(
+    session,
+    "Logged a sale",
+    `${pigTag ? `${pigTag} — ` : ""}${channel} sale, ${fmtMoney(revenue, currency)}`,
+    "/app/sales"
+  );
 
   revalidatePath("/app/sales");
   revalidatePath("/app");
@@ -64,7 +76,12 @@ export async function createSaleAction(formData: FormData) {
 export async function deleteSaleAction(formData: FormData) {
   const session = await requireManagerSession();
   const id = str(formData, "id");
+  const [sale] = await db.select().from(schema.sales).where(and(eq(schema.sales.farmId, session.farmId), eq(schema.sales.id, id))).limit(1);
   await db.delete(schema.sales).where(and(eq(schema.sales.farmId, session.farmId), eq(schema.sales.id, id)));
+  if (sale) {
+    const currency = await getFarmCurrency(session.farmId);
+    await logActivity(session, "Deleted a sale", `${sale.pigTag ? `${sale.pigTag} — ` : ""}${sale.channel} sale, ${fmtMoney(sale.revenue, currency)}`, "/app/sales");
+  }
   revalidatePath("/app/sales");
   redirect("/app/sales");
 }

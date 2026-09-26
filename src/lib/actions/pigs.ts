@@ -7,6 +7,7 @@ import { readSession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { getFarmUnit } from "@/lib/gate";
 import { displayToKg } from "@/lib/units";
+import { logActivity } from "@/lib/activity";
 
 async function requireManagerSession() {
   const session = await readSession();
@@ -102,6 +103,8 @@ export async function createPigAction(formData: FormData) {
     acquiredDate: acquiredDate,
     weightLog: appendWeightLog([], weight, acquiredOnly ? acquiredDate!.toISOString().slice(0, 10) : undefined),
   });
+
+  await logActivity(session, "Added pig", `${name} (${tag})`, `/app/pigs/${encodeURIComponent(tag)}`);
 
   revalidatePath("/app/pigs");
   redirect("/app/pigs");
@@ -203,6 +206,13 @@ export async function updatePigAction(formData: FormData) {
       .where(and(eq(schema.sales.farmId, farmId), eq(schema.sales.pigTag, originalTag)));
   }
 
+  await logActivity(
+    session,
+    "Updated pig",
+    `${str(formData, "name") || pig!.name} (${newTag})${weightChanged ? ` — weight updated` : ""}`,
+    `/app/pigs/${encodeURIComponent(newTag)}`
+  );
+
   revalidatePath("/app/pigs");
   redirect("/app/pigs");
 }
@@ -223,6 +233,8 @@ export async function syncPigStageAction(formData: FormData) {
     .set({ status: newStage, updatedAt: new Date() })
     .where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.tag, tag)));
 
+  await logActivity(session, "Updated pig stage", `${tag} — now ${newStage}`, `/app/pigs/${encodeURIComponent(tag)}`);
+
   revalidatePath("/app/pigs");
   revalidatePath(`/app/pigs/${tag}`);
   revalidatePath("/app");
@@ -233,7 +245,9 @@ export async function deletePigAction(formData: FormData) {
   const session = await requireManagerSession();
   const tag = str(formData, "tag");
   if (!tag) redirect("/app/pigs");
+  const [pig] = await db.select().from(schema.pigs).where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.tag, tag))).limit(1);
   await db.delete(schema.pigs).where(and(eq(schema.pigs.farmId, session.farmId), eq(schema.pigs.tag, tag)));
+  if (pig) await logActivity(session, "Deleted pig", `${pig.name} (${tag})`, "/app/pigs");
   revalidatePath("/app/pigs");
   redirect("/app/pigs");
 }

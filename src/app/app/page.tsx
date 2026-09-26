@@ -65,7 +65,7 @@ export default async function DashboardPage() {
   const readyForFinishing = pigs.filter(
     (p) => ["grower", "finisher"].includes(p.status) && p.currentWeightKg >= growthRules.finisher.endWeightMinKg
   ).length;
-  const rationsBelowReorder = feedInventory.filter((f) => f.stockKg < f.reorderLevelKg).length;
+  const rationsBelowReorder = feedInventory.filter((f) => f.stockKg <= f.reorderLevelKg).length;
 
   // Feed runs-out estimate: farm-wide daily consumption per ration (per-pig
   // plans plus bulk pens' total/duration daily-equivalent — see
@@ -181,12 +181,12 @@ export default async function DashboardPage() {
     }
   }
   for (const f of feedInventory) {
-    if (f.stockKg < f.reorderLevelKg) {
+    if (f.stockKg <= f.reorderLevelKg) {
       tasks.push({
-        title: `${f.feedType} below reorder point`,
+        title: `${f.feedType} at or below reorder point`,
         sub: `${fmtWeight(f.stockKg, unit, 0)} on hand · reorder at ${fmtWeight(f.reorderLevelKg, unit, 0)}`,
-        badge: "upcoming",
-        cls: "warn",
+        badge: "overdue",
+        cls: "critical",
         href: "/app/feed",
       });
     }
@@ -275,11 +275,11 @@ export default async function DashboardPage() {
           <div className="v num">{pregnant.length}</div>
           <div className="d">{pregnant.length === 0 ? "No active pregnancies" : `${pregnant.length} active ${pregnant.length === 1 ? "pregnancy" : "pregnancies"}`}</div>
         </div>
-        <div className="card stat-tile p-[17px_18px]">
+        <div className={`card stat-tile p-[17px_18px]${rationsBelowReorder > 0 ? " critical" : ""}`}>
           <div className="k"><Icon name="wheat" />Feed on hand</div>
           <div className="v num">{fmtWeight(totalFeedKg, unit, 0)}</div>
-          <div className={`d${rationsBelowReorder > 0 ? " warn" : ""}`}>
-            {rationsBelowReorder === 0 ? "All rations stocked" : `${rationsBelowReorder} ${rationsBelowReorder === 1 ? "ration" : "rations"} below reorder point`}
+          <div className={`d${rationsBelowReorder > 0 ? " critical" : ""}`}>
+            {rationsBelowReorder === 0 ? "All rations stocked" : `${rationsBelowReorder} ${rationsBelowReorder === 1 ? "ration" : "rations"} at or below reorder point`}
           </div>
         </div>
         <div className="card stat-tile p-[17px_18px]">

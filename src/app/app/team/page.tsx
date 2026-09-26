@@ -2,6 +2,7 @@ import { requireOwner } from "@/lib/auth";
 import { requireActiveFarm } from "@/lib/gate";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
+import Link from "next/link";
 import { createTeamMemberAction, removeTeamMemberAction } from "@/lib/actions/auth";
 import { Icon } from "@/components/icons";
 
@@ -55,7 +56,10 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       <div className="card divide-y divide-border">
         {members.map((m) => (
           <div key={m.id} className="flex items-center justify-between gap-3 p-4 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href={`/app/team/${m.id}`}
+              className="flex items-center gap-3 min-w-0 flex-1 rounded-lg -m-2 p-2 hover:bg-surface-2"
+            >
               <div className="avatar-circle shrink-0">
                 {m.avatarUrl ? (
                   <img src={m.avatarUrl} alt="" />
@@ -72,7 +76,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                 <div className="font-semibold text-sm truncate">{m.name}</div>
                 <div className="text-xs text-muted truncate">{m.email}</div>
               </div>
-            </div>
+            </Link>
             <div className="flex items-center gap-2 shrink-0">
               <span className={`badge ${m.role === "owner" ? "badge-info" : m.role === "manager" ? "badge-good" : "badge-muted"}`}>
                 {m.role}
@@ -88,7 +92,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
             </div>
           </div>
         ))}
+        {members.length === 0 && <div className="text-center text-muted py-8">No team members yet.</div>}
       </div>
+      <p className="text-xs text-muted mt-3">Click a team member to see their activity on the farm.</p>
     </div>
   );
 }
