@@ -6,13 +6,15 @@ import { createBreedingAction, logFarrowOutcomeAction, deleteBreedingAction } fr
 import { Icon } from "@/components/icons";
 import { fmtDate } from "@/lib/format";
 import { weightUnitLabel } from "@/lib/units";
+import { GESTATION_DAYS, isActivePregnancy, daysBetween } from "@/lib/gestation";
+import Link from "next/link";
 
-export default async function BreedingPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function BreedingPage({ searchParams }: { searchParams: Promise<{ error?: string; warning?: string; litterRecorded?: string }> }) {
   const session = await requireSession();
   const farm = await requireActiveFarm(session);
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const unitLabel = weightUnitLabel(unit);
-  const { error } = await searchParams;
+  const { error, warning, litterRecorded } = await searchParams;
   const isManager = session.role !== "worker";
 
   const [records, pigs] = await Promise.all([
@@ -24,8 +26,8 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
 
   const today = new Date();
   const yr = today.getFullYear().toString();
-  const expecting = records.filter((b) => !b.actualFarrowDate);
-  const dueSoon = expecting.filter((b) => Math.round((b.expectedFarrowDate.getTime() - today.getTime()) / 86400000) <= 30).length;
+  const expecting = records.filter(isActivePregnancy);
+  const dueSoon = expecting.filter((b) => daysBetween(today, b.expectedFarrowDate) <= 30).length;
   const farrowedYtd = records.filter((b) => b.actualFarrowDate && b.actualFarrowDate.getFullYear().toString() === yr);
   const pigletsYtd = farrowedYtd.reduce((s, b) => s + (b.litterSize ?? 0), 0);
 
@@ -34,6 +36,37 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
       <h1 className="text-2xl font-bold text-ink mb-1">Breeding &amp; pregnancy</h1>
       <p className="text-ink-soft text-sm mb-6">Matings, gestation countdowns and farrowing outcomes.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
+      {warning && (
+        <div className="mb-4 text-sm rounded-lg px-3 py-2.5 bg-[#fdecc8] text-[#7a4a08] flex items-start gap-2">
+          <Icon name="alert" className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            <b>Lineage warning:</b> {warning} The mating was saved anyway — double-check this is intentional.
+          </span>
+        </div>
+      )}
+      {litterRecorded && (
+        <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">
+          Litter recorded — {litterRecorded} piglet{litterRecorded === "1" ? "" : "s"} added to the herd.
+        </div>
+      )}
+
+      <h2 className="font-bold text-ink mb-2 text-[15px]">Gestation cycle</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-3.5">
+        <div className="card bg-accent-soft flex items-center gap-3 px-4 py-3.5 text-[#0f6b34]">
+          <Icon name="calendar" className="w-5 h-5 shrink-0" />
+          <div>
+            <div className="font-bold text-sm">Gestation</div>
+            <div className="text-sm">{GESTATION_DAYS} days</div>
+          </div>
+        </div>
+        <div className="card bg-accent-soft flex items-center gap-3 px-4 py-3.5 text-[#0f6b34]">
+          <Icon name="heart" className="w-5 h-5 shrink-0" />
+          <div>
+            <div className="font-bold text-sm">Estrus (in heat)</div>
+            <div className="text-sm">18 – 24 days</div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-6">
         <div className="card stat-tile p-[17px_18px]">
@@ -53,7 +86,7 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Log a breeding</h2>
-        <form action={createBreedingAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+        <form action={createBreedingAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 items-end">
           <div className="field">
             <label>Sow</label>
             <select name="sowTag" required>
@@ -79,11 +112,10 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
             <label>Mating date</label>
             <input type="date" name="matingDate" required />
           </div>
-          <div className="field">
-            <label>Expected farrow</label>
-            <input type="date" name="expectedFarrowDate" required />
-          </div>
-          <div className="col-span-2 md:col-span-4">
+          <div className="col-span-2 md:col-span-3">
+            <p className="text-[11.5px] text-muted mb-2">
+              Expected farrow date is calculated automatically — {GESTATION_DAYS} days from the mating date.
+            </p>
             <button type="submit" className="btn btn-primary">
               Log breeding
             </button>
@@ -111,9 +143,11 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
                 <td>{fmtDate(b.matingDate)}</td>
                 <td>{fmtDate(b.expectedFarrowDate)}</td>
                 <td>
-                  {b.actualFarrowDate ? (
+                  {b.status === "returned-to-heat" ? (
+                    <span className="badge badge-muted">returned to heat</span>
+                  ) : b.actualFarrowDate ? (
                     <span className="badge badge-good">
-                      {b.litterSize ?? 0} born · {fmtDate(b.actualFarrowDate)}
+                      litter #{b.litterNumber ?? "?"} · {b.litterSize ?? 0} born · {fmtDate(b.actualFarrowDate)}
                     </span>
                   ) : (
                     <span className="badge badge-info">expecting</span>
@@ -121,9 +155,11 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
                 </td>
                 {isManager && (
                   <td className="text-right whitespace-nowrap">
-                    {!b.actualFarrowDate && (
+                    {b.status !== "returned-to-heat" && !b.litterRecorded && (
                       <details className="inline-block relative">
-                        <summary className="btn btn-small cursor-pointer list-none">Log outcome</summary>
+                        <summary className="btn btn-small cursor-pointer list-none">
+                          {b.actualFarrowDate ? "Edit outcome" : "Log outcome"}
+                        </summary>
                         <form
                           action={logFarrowOutcomeAction}
                           className="card p-4 absolute right-0 z-10 w-72 mt-2 space-y-2 text-left"
@@ -131,15 +167,15 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
                           <input type="hidden" name="breedingId" value={b.id} />
                           <div className="field">
                             <label>Farrow date</label>
-                            <input type="date" name="actualFarrowDate" required />
+                            <input type="date" name="actualFarrowDate" required defaultValue={b.actualFarrowDate ? b.actualFarrowDate.toISOString().slice(0, 10) : undefined} />
                           </div>
                           <div className="field">
                             <label>Litter size</label>
-                            <input type="number" min="0" name="litterSize" />
+                            <input type="number" min="0" name="litterSize" defaultValue={b.litterSize ?? undefined} />
                           </div>
                           <div className="field">
                             <label>Piglets weaned</label>
-                            <input type="number" min="0" name="pigletsWeaned" />
+                            <input type="number" min="0" name="pigletsWeaned" defaultValue={b.pigletsWeaned ?? undefined} />
                           </div>
                           <div className="field">
                             <label>Total litter weight ({unitLabel})</label>
@@ -151,6 +187,12 @@ export default async function BreedingPage({ searchParams }: { searchParams: Pro
                         </form>
                       </details>
                     )}
+                    {b.actualFarrowDate && !!b.litterSize && b.litterSize > 0 && !b.litterRecorded && (
+                      <Link href={`/app/breeding/${b.id}/litter`} className="btn btn-small btn-primary ml-1">
+                        Record litter
+                      </Link>
+                    )}
+                    {b.litterRecorded && <span className="badge badge-muted ml-1">litter recorded</span>}
                     <form action={deleteBreedingAction} className="inline ml-1">
                       <input type="hidden" name="id" value={b.id} />
                       <button type="submit" className="btn btn-small btn-danger">

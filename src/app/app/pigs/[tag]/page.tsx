@@ -10,9 +10,11 @@ import { growthStatus, timeToMarket } from "@/lib/growth";
 import { STAGE_LABEL } from "@/lib/growth-rules";
 import { getGrowthStageRules } from "@/lib/growth-rules-db";
 import { syncPigStageAction } from "@/lib/actions/pigs";
+import { confirmPregnancyCheckAction, markGestationMilestoneAction, logFarrowOutcomeAction } from "@/lib/actions/breeding";
 import { fmtDate, fmtDateShort } from "@/lib/format";
 import { kgToDisplay, weightUnitLabel, fmtWeight, fmtWeightDelta } from "@/lib/units";
 import { classifySex } from "@/lib/pig-classification";
+import { gestationMilestones } from "@/lib/gestation";
 
 const STATUS_STYLE: Record<string, { cls: string; label: string }> = {
   piglet: { cls: "info", label: "Piglet" },
@@ -65,6 +67,14 @@ export default async function PigProfilePage({
   const relatedBreeding = breeding
     .filter((b) => b.sowTag === pig!.tag || b.boarTag === pig!.tag)
     .sort((a, b) => b.matingDate.getTime() - a.matingDate.getTime());
+  // The most recent cycle where this pig was the sow, as long as it's still
+  // open — actively gestating, or farrowed but its litter hasn't been
+  // recorded yet — is what drives the "Gestation milestones" card below.
+  // A returned-to-heat or fully-closed-out (litter recorded) cycle has
+  // nothing left to track, so the card just doesn't render for those.
+  const latestSowBreeding = relatedBreeding.find(
+    (b) => b.sowTag === pig!.tag && b.status !== "returned-to-heat" && !b.litterRecorded
+  );
   const recentMedical = [...medical].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
 
   const s = STATUS_STYLE[pig!.status] ?? { cls: "muted", label: pig!.status };
@@ -169,6 +179,117 @@ export default async function PigProfilePage({
           </div>
         </div>
       </div>
+
+      {latestSowBreeding && (
+        <div className="card p-5 mb-3.5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="font-semibold text-[15.5px]">Gestation milestones</h3>
+            <span className="text-[11.5px] text-muted">
+              × {latestSowBreeding.boarName ?? latestSowBreeding.boarTag ?? "unknown boar"} · mated {fmtDate(latestSowBreeding.matingDate)}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            {gestationMilestones(latestSowBreeding, new Date()).map((m, i, arr) => {
+              const badgeCls = m.state === "done" ? "good" : m.state === "due" ? "warn" : "muted";
+              const badgeText = m.state === "done" ? "done" : m.state === "due" ? "due" : "upcoming";
+              return (
+                <div key={m.key} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className={`w-3 h-3 rounded-full shrink-0 ${m.state === "done" ? "bg-good" : m.state === "due" ? "bg-warn" : "bg-border"}`} />
+                    {i < arr.length - 1 && <span className="w-px flex-1 bg-border" style={{ minHeight: 20 }} />}
+                  </div>
+                  <div className="pb-5 flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="text-sm font-semibold">
+                        {m.label}
+                        {m.key !== "mated" && <span className="text-muted font-normal"> (Day {m.day})</span>}
+                      </div>
+                      <span className={`badge badge-${badgeCls}`}>{badgeText}</span>
+                    </div>
+                    <div className="text-xs text-muted mt-0.5">
+                      {m.state === "done" && m.doneDate ? `Confirmed ${fmtDate(m.doneDate)}` : `Target: ${fmtDate(m.targetDate)}`}
+                    </div>
+
+                    {m.key === "check" && m.state === "due" && (
+                      <div className="flex gap-2 mt-2">
+                        <form action={confirmPregnancyCheckAction}>
+                          <input type="hidden" name="breedingId" value={latestSowBreeding.id} />
+                          <input type="hidden" name="result" value="pregnant" />
+                          <button type="submit" className="btn btn-small btn-primary">
+                            Still pregnant
+                          </button>
+                        </form>
+                        <form action={confirmPregnancyCheckAction}>
+                          <input type="hidden" name="breedingId" value={latestSowBreeding.id} />
+                          <input type="hidden" name="result" value="returned-to-heat" />
+                          <button type="submit" className="btn btn-small btn-danger">
+                            Returned to heat
+                          </button>
+                        </form>
+                      </div>
+                    )}
+
+                    {(m.key === "pen" || m.key === "prep") && m.state === "due" && (
+                      <form action={markGestationMilestoneAction} className="mt-2">
+                        <input type="hidden" name="breedingId" value={latestSowBreeding.id} />
+                        <input type="hidden" name="milestone" value={m.key} />
+                        <button type="submit" className="btn btn-small">
+                          Mark done
+                        </button>
+                      </form>
+                    )}
+
+                    {m.key === "farrow" && m.state === "done" && (
+                      <div className="text-xs mt-1">
+                        Litter #{latestSowBreeding.litterNumber ?? "?"} — {latestSowBreeding.litterSize ?? 0} born
+                        {latestSowBreeding.litterSize && latestSowBreeding.litterSize > 0 && !latestSowBreeding.litterRecorded && isManager && (
+                          <>
+                            {" · "}
+                            <Link href={`/app/breeding/${latestSowBreeding.id}/litter`} className="font-semibold text-accent">
+                              Record the litter →
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {m.key === "farrow" && m.state !== "done" && isManager && (
+                      <details className="relative mt-2">
+                        <summary className="btn btn-small cursor-pointer list-none">Log farrowing outcome</summary>
+                        <form
+                          action={logFarrowOutcomeAction}
+                          className="card p-4 absolute left-0 z-10 w-72 mt-2 space-y-2 text-left"
+                        >
+                          <input type="hidden" name="breedingId" value={latestSowBreeding.id} />
+                          <div className="field">
+                            <label>Farrow date</label>
+                            <input type="date" name="actualFarrowDate" required />
+                          </div>
+                          <div className="field">
+                            <label>Litter size</label>
+                            <input type="number" min="0" name="litterSize" />
+                          </div>
+                          <div className="field">
+                            <label>Piglets weaned</label>
+                            <input type="number" min="0" name="pigletsWeaned" />
+                          </div>
+                          <div className="field">
+                            <label>Total litter weight ({unitLabel})</label>
+                            <input type="number" step="0.1" min="0" name="totalLitterWeightKg" />
+                          </div>
+                          <button type="submit" className="btn btn-primary btn-small w-full justify-center">
+                            Save outcome
+                          </button>
+                        </form>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {ttm && (
         <div className="card p-5 mb-3.5">

@@ -2,9 +2,12 @@ import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { growthStatus } from "@/lib/growth";
 import { getGrowthStageRules } from "@/lib/growth-rules-db";
+import { gestationMilestones, isActivePregnancy } from "@/lib/gestation";
 
 /** How many "needs attention" items a farm currently has — pregnancies due
- * within 30 days, medical follow-ups due within 14 days, feed below its
+ * within 30 days, a gestation milestone (day-21 pregnancy check, day-90
+ * move-to-pen, day-110 farrowing prep) that's come due and hasn't been
+ * confirmed yet, medical follow-ups due within 14 days, feed below its
  * reorder point, a per-pig pen not logged for feeding today, a bulk pen
  * due or overdue for its next top-up, and pigs that are behind/overdue on
  * growth-stage weight or have aged into a new stage. Mirrors the
@@ -27,6 +30,12 @@ export async function needsAttentionCount(farmId: string): Promise<number> {
   for (const b of breeding) {
     if (b.actualFarrowDate) continue;
     if ((b.expectedFarrowDate.getTime() - now) / 86400000 <= 30) count++;
+  }
+  for (const b of breeding) {
+    if (!isActivePregnancy(b)) continue;
+    for (const m of gestationMilestones(b, today)) {
+      if (m.key !== "mated" && m.key !== "farrow" && m.state === "due") count++;
+    }
   }
   for (const m of medical) {
     if (!m.nextDueDate) continue;

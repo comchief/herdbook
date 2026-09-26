@@ -92,10 +92,21 @@ export const pigs = pgTable(
     dailyFeedKg: doublePrecision("daily_feed_kg"),
     weightLog: jsonb("weight_log").notNull().default([]),
     changeLog: jsonb("change_log").notNull().default([]),
+    // Set only for a piglet created through the litter workflow (see
+    // recordLitterAction in src/lib/actions/breeding.ts) — points back at
+    // the breeding record whose farrowing produced it, so littermates can
+    // be found later. Null for every pig added by hand. onDelete "set
+    // null" (not cascade): deleting the breeding record shouldn't delete
+    // pigs that were actually born.
+    breedingRecordId: text("breeding_record_id").references(() => breedingRecords.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("pigs_farm_tag_idx").on(t.farmId, t.tag), index("pigs_farm_idx").on(t.farmId)]
+  (t) => [
+    uniqueIndex("pigs_farm_tag_idx").on(t.farmId, t.tag),
+    index("pigs_farm_idx").on(t.farmId),
+    index("pigs_breeding_record_idx").on(t.breedingRecordId),
+  ]
 );
 
 /** A farm's own list of pig breeds, offered on the "Add/edit a pig" Breed
@@ -162,6 +173,16 @@ export const medicalRecords = pgTable(
   (t) => [index("medical_farm_idx").on(t.farmId)]
 );
 
+/** One row per mating, tracking a sow's gestation cycle end-to-end from
+ * mating to farrowing. `status` is one of "confirmed-pregnant" (the
+ * default — still gestating, whether or not the day-21 check has happened
+ * yet), "farrowed", or "returned-to-heat" (the day-21 check found her back
+ * in heat — the cycle is cancelled and this record is kept as a log, per
+ * gestationMilestones in src/lib/gestation.ts). The four gestation
+ * milestone booleans below (pregnancyCheckDone, movedToFarrowingPen,
+ * farrowingPrepStarted, and actualFarrowDate itself) are what
+ * gestationMilestones renders as the sow's timeline on her profile page —
+ * see src/app/app/pigs/[tag]/page.tsx's "Gestation milestones" card. */
 export const breedingRecords = pgTable(
   "breeding_records",
   {
@@ -174,6 +195,9 @@ export const breedingRecords = pgTable(
     boarTag: text("boar_tag"),
     boarName: text("boar_name"),
     matingDate: timestamp("mating_date").notNull(),
+    // Auto-calculated at logging time as matingDate + 114 days (the swine
+    // gestation rule — see GESTATION_DAYS in src/lib/gestation.ts). No
+    // longer entered by hand.
     expectedFarrowDate: timestamp("expected_farrow_date").notNull(),
     actualFarrowDate: timestamp("actual_farrow_date"),
     litterSize: integer("litter_size"),
@@ -181,6 +205,24 @@ export const breedingRecords = pgTable(
     totalLitterWeightKg: doublePrecision("total_litter_weight_kg"),
     status: text("status").notNull().default("confirmed-pregnant"),
     notes: text("notes"),
+    // Day-21 "did she come back into heat" check (confirmPregnancyCheckAction).
+    pregnancyCheckDone: boolean("pregnancy_check_done").notNull().default(false),
+    pregnancyCheckDate: timestamp("pregnancy_check_date"),
+    returnedToHeat: boolean("returned_to_heat").notNull().default(false),
+    // Day-90 / day-110 one-click milestones (markGestationMilestoneAction).
+    movedToFarrowingPen: boolean("moved_to_farrowing_pen").notNull().default(false),
+    movedToFarrowingPenDate: timestamp("moved_to_farrowing_pen_date"),
+    farrowingPrepStarted: boolean("farrowing_prep_started").notNull().default(false),
+    farrowingPrepStartedDate: timestamp("farrowing_prep_started_date"),
+    // Assigned once, the first time farrowing is logged for this sow: the
+    // count of her prior farrowed litters + 1. Not recomputed on a later
+    // edit of the same outcome.
+    litterNumber: integer("litter_number"),
+    // True once the litter workflow (recordLitterAction) has actually
+    // created the individual piglet pig rows for this farrowing — until
+    // then, litterSize/totalLitterWeightKg are just the aggregate numbers
+    // entered in the outcome form, unlinked to real pig records.
+    litterRecorded: boolean("litter_recorded").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("breeding_farm_idx").on(t.farmId)]

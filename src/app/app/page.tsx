@@ -14,6 +14,7 @@ import { getGrowthStageRules } from "@/lib/growth-rules-db";
 import { fmtMoney, fmtMoneyCompact, currencyFlag } from "@/lib/currency";
 import { fetchCurrentWeather, localHour } from "@/lib/weather";
 import { dailyConsumptionByRation } from "@/lib/feed-consumption";
+import { gestationMilestones, isActivePregnancy } from "@/lib/gestation";
 function daysBetween(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
   const firstName = (user?.name ?? "there").split(" ")[0];
   const localHr = localHour(farm.timezone);
 
-  const pregnant = breeding.filter((b) => !b.actualFarrowDate);
+  const pregnant = breeding.filter(isActivePregnancy);
   const totalFeedKg = feedInventory.reduce((s, f) => s + f.stockKg, 0);
   const today = new Date();
   const ym = today.toISOString().slice(0, 7);
@@ -134,6 +135,17 @@ export default async function DashboardPage() {
         badge: d < 0 ? "overdue" : "upcoming",
         cls: d <= 7 ? "critical" : "warn",
         href: "/app/breeding",
+      });
+    }
+    for (const m of gestationMilestones(b, today)) {
+      if (m.key === "mated" || m.key === "farrow" || m.state !== "due") continue;
+      const overdueDays = daysBetween(m.targetDate, today);
+      tasks.push({
+        title: `${b.sowName ?? b.sowTag} — ${m.label.toLowerCase()}`,
+        sub: `${overdueDays === 0 ? "due today" : `${overdueDays} days overdue`} · day ${m.day} of gestation`,
+        badge: overdueDays === 0 ? "due" : "overdue",
+        cls: overdueDays > 3 ? "critical" : "warn",
+        href: `/app/pigs/${b.sowTag}`,
       });
     }
   }
