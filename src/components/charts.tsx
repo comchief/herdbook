@@ -143,19 +143,24 @@ export type LinePoint = { label: string; value: number };
 
 /** Single-series trend line with an area wash beneath it (a single series
  * needs no legend — the card title already says what's plotted). The last
- * point is end-labeled since that's the value the reader wants first. */
+ * point is end-labeled since that's the value the reader wants first.
+ * `variant="bar-line"` swaps the area wash for one bar per point (same
+ * metric, same scale — not a second series) with the line and end-dots
+ * riding on top, per the dataviz skill's bar/line mark specs. */
 export function LineChart({
   points,
   height = 150,
   color = "#2a78d6",
   valueFormat,
   emptyMessage = "Not enough data yet — record a few pig weigh-ins to see the trend.",
+  variant = "line",
 }: {
   points: LinePoint[];
   height?: number;
   color?: string;
   valueFormat?: (n: number) => string;
   emptyMessage?: string;
+  variant?: "line" | "bar-line";
 }) {
   const fmt = valueFormat ?? ((n: number) => fmtCompact(n));
   if (points.length < 2) {
@@ -171,6 +176,7 @@ export function LineChart({
   const span = max - min || 1;
   const innerH = height - padTop - padBottom;
   const stepX = width / (points.length - 1);
+  const baseline = height - padBottom;
 
   const coords = points.map((p, i) => {
     const x = i * stepX;
@@ -179,14 +185,43 @@ export function LineChart({
   });
 
   const line = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
-  const area = `${line} L${coords[coords.length - 1].x.toFixed(1)},${height - padBottom} L0,${height - padBottom} Z`;
+  const area = `${line} L${coords[coords.length - 1].x.toFixed(1)},${baseline} L0,${baseline} Z`;
   const last = coords[coords.length - 1];
+
+  // Bar geometry for the "bar-line" variant: <=24px thick, 4px rounded top
+  // corners, square at the baseline — clamped so a short bar's radius never
+  // exceeds half its own height.
+  const barWidth = Math.min(24, stepX * 0.6);
+  const halfW = barWidth / 2;
+  const bars = coords.map((c) => {
+    const x0 = c.x - halfW;
+    const x1 = c.x + halfW;
+    const barH = Math.max(0, baseline - c.y);
+    const r = Math.min(4, barH / 2, halfW);
+    const path =
+      barH <= 0.5
+        ? ""
+        : `M${x0.toFixed(1)},${baseline.toFixed(1)} ` +
+          `L${x0.toFixed(1)},${(c.y + r).toFixed(1)} ` +
+          `Q${x0.toFixed(1)},${c.y.toFixed(1)} ${(x0 + r).toFixed(1)},${c.y.toFixed(1)} ` +
+          `L${(x1 - r).toFixed(1)},${c.y.toFixed(1)} ` +
+          `Q${x1.toFixed(1)},${c.y.toFixed(1)} ${x1.toFixed(1)},${(c.y + r).toFixed(1)} ` +
+          `L${x1.toFixed(1)},${baseline.toFixed(1)} Z`;
+    return { ...c, path };
+  });
 
   return (
     <div>
       <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Trend over time">
-        <line x1={0} y1={height - padBottom} x2={width} y2={height - padBottom} stroke="var(--border)" strokeWidth={1} />
-        <path d={area} fill={color} opacity={0.1} />
+        <line x1={0} y1={baseline} x2={width} y2={baseline} stroke="var(--border)" strokeWidth={1} />
+        {variant === "bar-line"
+          ? bars.map((b, i) => {
+              if (!b.path) return null;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const titleAttr: any = { title: `${b.label}: ${fmt(b.value)}` };
+              return <path key={i} d={b.path} fill={color} fillOpacity={0.32} {...titleAttr} />;
+            })
+          : <path d={area} fill={color} opacity={0.1} />}
         <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         {coords.map((c, i) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

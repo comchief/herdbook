@@ -290,7 +290,7 @@ export default async function PigProfilePage({
           <h3 className="font-semibold text-[15.5px]">Weight history</h3>
           <span className="text-[11.5px] text-muted">from recorded weigh-ins</span>
         </div>
-        <LineChart points={weightPoints} valueFormat={(n) => `${n.toFixed(1)} ${unitLabel}`} />
+        <LineChart points={weightPoints} valueFormat={(n) => `${n.toFixed(1)} ${unitLabel}`} variant="bar-line" />
         {weightLogRows.length > 0 && (
           <div className="mt-4 pt-1 border-t border-border flex flex-col">
             {weightLogRows.map((entry, i) => {

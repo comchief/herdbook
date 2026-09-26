@@ -166,16 +166,21 @@ export default async function FeedPage({
                 const bulkDailyKg = plan ? plan.totalWeightKg / Math.max(plan.durationDays, 1) : 0;
                 const hasPlan = plan || onPlan.length > 0;
 
+                // Hoisted so the bulk pen's "Log feeding" button below can
+                // disable itself until the plan is actually due — a bulk
+                // top-up isn't a same-day action like a per-pig log.
+                const daysLeft = plan ? plan.durationDays - daysBetween(plan.startDate, today) : null;
+
                 let statusBadge: React.ReactNode = null;
                 if (plan) {
-                  const daysLeft = plan.durationDays - daysBetween(plan.startDate, today);
+                  const dLeft = daysLeft!;
                   statusBadge =
-                    daysLeft > 0 ? (
-                      <span className="badge badge-good">Due in {daysLeft}d</span>
-                    ) : daysLeft === 0 ? (
+                    dLeft > 0 ? (
+                      <span className="badge badge-good">Due in {dLeft}d</span>
+                    ) : dLeft === 0 ? (
                       <span className="badge badge-warn">Due today</span>
                     ) : (
-                      <span className="badge badge-critical">Overdue by {Math.abs(daysLeft)}d</span>
+                      <span className="badge badge-critical">Overdue by {Math.abs(dLeft)}d</span>
                     );
                 } else if (onPlan.length > 0) {
                   const loggedToday = logs.some(
@@ -217,14 +222,27 @@ export default async function FeedPage({
                     </td>
                     <td>{statusBadge}</td>
                     <td className="text-right whitespace-nowrap">
-                      {hasPlan && (
-                        <form action={logPenFeedingAction} className="inline">
-                          <input type="hidden" name="pen" value={penName} />
-                          <button type="submit" className="btn btn-small btn-primary">
-                            Log feeding
-                          </button>
-                        </form>
-                      )}
+                      {hasPlan &&
+                        (() => {
+                          // Bulk pens are an ad-lib top-up on a multi-day
+                          // schedule, not a daily action — only let it be
+                          // logged once it's actually due (matches the
+                          // "Due today"/"Overdue" badge states above).
+                          const notYetDue = plan !== undefined && daysLeft !== null && daysLeft > 0;
+                          return (
+                            <form action={logPenFeedingAction} className="inline">
+                              <input type="hidden" name="pen" value={penName} />
+                              <button
+                                type="submit"
+                                className="btn btn-small btn-primary"
+                                disabled={notYetDue}
+                                title={notYetDue ? `Not due for ${daysLeft} more day${daysLeft === 1 ? "" : "s"}` : undefined}
+                              >
+                                Log feeding
+                              </button>
+                            </form>
+                          );
+                        })()}
                       {isManager && (
                         <details className="relative inline-block ml-2">
                           <summary className="btn btn-small cursor-pointer list-none">{plan ? "Edit feeding" : "Assign feeding"}</summary>

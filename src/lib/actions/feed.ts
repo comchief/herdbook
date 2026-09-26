@@ -308,6 +308,13 @@ export async function logPenFeedingAction(formData: FormData) {
     .limit(1);
 
   if (plan) {
+    // Bulk pens are an ad-lib top-up on a multi-day schedule, not a daily
+    // action — mirror the "Log feeding" button's disabled state (only
+    // clickable once the plan is due) so a request replayed or submitted
+    // outside the disabled button can't log a top-up early.
+    const daysLeft = plan.durationDays - Math.round((today.getTime() - plan.startDate.getTime()) / 86400000);
+    if (daysLeft > 0) redirect("/app/feed?error=" + encodeURIComponent(`${pen} isn't due yet — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left.`));
+
     const inv = await deductInventory(session.farmId, plan.feedType, plan.totalWeightKg);
     await db.insert(schema.feedLogs).values({
       farmId: session.farmId,

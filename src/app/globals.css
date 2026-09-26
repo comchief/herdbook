@@ -190,6 +190,7 @@ h1, h2, h3 {
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn-danger { color: var(--critical); border-color: #fbdada; }
 .btn-small { padding: 6px 12px; font-size: 12px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .field label {
   font-size: 11.5px;
