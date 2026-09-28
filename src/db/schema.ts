@@ -341,6 +341,29 @@ export const expenses = pgTable(
   (t) => [index("expenses_farm_idx").on(t.farmId)]
 );
 
+/** Money put into the farm from outside its everyday operations — owner
+ * equity, a loan drawdown, a grant, another investor's buy-in. Kept
+ * entirely separate from expenses/revenue: it's financing, not an
+ * operating cost, so it never touches the Profit/loss, YTD figure on the
+ * Expense tracker page. Shown there as its own "Investment capital" card
+ * with a running history, mirroring the expense log next to it. */
+export const capitalContributions = pgTable(
+  "capital_contributions",
+  {
+    id: id(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id, { onDelete: "cascade" }),
+    date: timestamp("date").notNull(),
+    type: text("type").notNull(), // "owner-equity" | "loan" | "grant" | "other"
+    source: text("source").notNull(), // who/where it came from, e.g. "Jo McAllister" or "NCB Jamaica"
+    notes: text("notes"),
+    amount: doublePrecision("amount").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("capital_contributions_farm_idx").on(t.farmId)]
+);
+
 /** A farm's claim that it paid — reviewed by hand by the Herdbook operator
  * since there is no connected payment processor. Approving one pushes the
  * farm's paidThroughDate forward. */

@@ -3,20 +3,33 @@ import { requireActiveFarm } from "@/lib/gate";
 import { db, schema } from "@/db";
 import { eq, desc } from "drizzle-orm";
 import { createExpenseAction, deleteExpenseAction } from "@/lib/actions/expenses";
+import { createCapitalContributionAction, deleteCapitalContributionAction } from "@/lib/actions/capital";
 import { Icon } from "@/components/icons";
 import { fmtDate } from "@/lib/format";
 import { fmtMoney } from "@/lib/currency";
+
+const CAPITAL_TYPE_LABEL: Record<string, string> = {
+  "owner-equity": "Owner equity",
+  loan: "Loan",
+  grant: "Grant",
+  other: "Other",
+};
 
 export default async function ExpensesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await requireManager();
   const farm = await requireActiveFarm(session);
   const { error } = await searchParams;
 
-  const [expenses, sales, feedLogs, medical] = await Promise.all([
+  const [expenses, sales, feedLogs, medical, capitalContributions] = await Promise.all([
     db.select().from(schema.expenses).where(eq(schema.expenses.farmId, session.farmId)).orderBy(desc(schema.expenses.date)),
     db.select().from(schema.sales).where(eq(schema.sales.farmId, session.farmId)),
     db.select().from(schema.feedLogs).where(eq(schema.feedLogs.farmId, session.farmId)),
     db.select().from(schema.medicalRecords).where(eq(schema.medicalRecords.farmId, session.farmId)),
+    db
+      .select()
+      .from(schema.capitalContributions)
+      .where(eq(schema.capitalContributions.farmId, session.farmId))
+      .orderBy(desc(schema.capitalContributions.date)),
   ]);
 
   const yr = new Date().getFullYear().toString();
@@ -28,6 +41,11 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const allYtdCosts = ytdExpenses + ytdFeedCost + ytdVetCost;
   const ytdRevenue = sales.filter((s) => s.date.getFullYear().toString() === yr).reduce((s, x) => s + x.revenue, 0);
   const profit = ytdRevenue - allYtdCosts;
+
+  // Financing, not an operating cost — kept out of the profit/loss figure
+  // above entirely (see the schema doc comment on capitalContributions).
+  const totalInvested = capitalContributions.reduce((s, c) => s + c.amount, 0);
+  const ytdInvested = capitalContributions.filter((c) => c.date.getFullYear().toString() === yr).reduce((s, c) => s + c.amount, 0);
 
   return (
     <div>
@@ -128,6 +146,99 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
               <tr>
                 <td colSpan={6} className="text-center text-muted py-10">
                   No expenses logged yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 className="font-bold text-ink mt-8 mb-1">Investment capital</h2>
+      <p className="text-ink-soft text-sm mb-3.5">Money put into the farm from outside its everyday operations — owner equity, a loan, a grant, another investor's buy-in. Kept separate from the profit/loss figure above.</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-6">
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="card" />Total invested, all-time</div>
+          <div className="v num">{fmtMoney(totalInvested, farm.currency)}</div>
+        </div>
+        <div className="card stat-tile p-[17px_18px]">
+          <div className="k"><Icon name="trend" />Invested, YTD</div>
+          <div className="v num">{fmtMoney(ytdInvested, farm.currency)}</div>
+        </div>
+      </div>
+
+      <div className="card p-5 mb-6">
+        <h2 className="font-bold mb-3">Log investment capital</h2>
+        <form action={createCapitalContributionAction} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+          <div className="field">
+            <label>Date</label>
+            <input type="date" name="date" required />
+          </div>
+          <div className="field">
+            <label>Type</label>
+            <select name="type" defaultValue="owner-equity">
+              <option value="owner-equity">Owner equity</option>
+              <option value="loan">Loan</option>
+              <option value="grant">Grant</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div className="field col-span-2">
+            <label>Source</label>
+            <input name="source" required placeholder="e.g. Jo McAllister, or NCB Jamaica" />
+          </div>
+          <div className="field col-span-2">
+            <label>Notes</label>
+            <input name="notes" placeholder="Optional" />
+          </div>
+          <div className="field">
+            <label>Amount</label>
+            <input type="number" step="0.01" min="0.01" name="amount" required />
+          </div>
+          <div>
+            <button type="submit" className="btn btn-primary">
+              Save contribution
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="card overflow-x-auto">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Source</th>
+              <th>Notes</th>
+              <th className="num">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {capitalContributions.map((c) => (
+              <tr key={c.id}>
+                <td>{fmtDate(c.date)}</td>
+                <td>
+                  <span className="badge badge-muted">{CAPITAL_TYPE_LABEL[c.type] ?? c.type}</span>
+                </td>
+                <td>{c.source}</td>
+                <td>{c.notes || "—"}</td>
+                <td className="font-semibold num">{fmtMoney(c.amount, farm.currency)}</td>
+                <td className="text-right">
+                  <form action={deleteCapitalContributionAction} className="inline">
+                    <input type="hidden" name="id" value={c.id} />
+                    <button type="submit" className="btn btn-small btn-danger">
+                      Delete
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+            {capitalContributions.length === 0 && (
+              <tr>
+                <td colSpan={6} className="text-center text-muted py-10">
+                  No investment capital logged yet.
                 </td>
               </tr>
             )}
