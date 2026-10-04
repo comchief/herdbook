@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { readSession } from "@/lib/session";
+import { requireOwner } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { getFarmUnit } from "@/lib/gate";
 import { displayToKg, displayCostToKg, fmtWeight } from "@/lib/units";
@@ -365,4 +366,83 @@ export async function logPenFeedingAction(formData: FormData) {
   revalidatePath("/app/feed");
   revalidatePath("/app");
   redirect("/app/feed?logged=1");
+}
+
+/** Owner-only: reverses a feeding that was confirmed with the calendar's
+ * "Log feeding" button — a mistaken tap, or a pen that wasn't actually fed.
+ * Puts back every kilogram that logging subtracted from inventory and
+ * removes the feed log row(s), so the pen shows as not-yet-fed again and
+ * its needs-attention alert comes back.
+ *
+ * One "Log feeding" tap can write several feed_logs rows (a mixed per-pig
+ * pen logs one per ration) that all share the same pen, source and exact
+ * timestamp, so the whole event is reversed together rather than leaving a
+ * half-undone feeding behind. For a bulk pen, reversing its most recent
+ * top-up also rewinds the due-again cycle to where it stood before that
+ * top-up (the previous top-up's date, or simply "due now" when there's no
+ * earlier one) so the pen is offered for feeding again instead of silently
+ * waiting out a cycle whose feeding never happened. Only calendar-logged
+ * usage can be reversed — manual purchases/usage movements keep their own
+ * Delete button. */
+export async function reverseFeedingAction(formData: FormData) {
+  const session = await requireOwner();
+  const id = str(formData, "id");
+  const unit = await getFarmUnit(session.farmId);
+
+  const [log] = await db
+    .select()
+    .from(schema.feedLogs)
+    .where(and(eq(schema.feedLogs.farmId, session.farmId), eq(schema.feedLogs.id, id)))
+    .limit(1);
+  if (!log || log.source !== "calendar" || log.direction !== "usage" || !log.pen) {
+    redirect("/app/feed?error=" + encodeURIComponent("That feeding can't be reversed — it may already have been."));
+  }
+
+  const allCalendarLogs = await db
+    .select()
+    .from(schema.feedLogs)
+    .where(and(eq(schema.feedLogs.farmId, session.farmId), eq(schema.feedLogs.pen, log.pen), eq(schema.feedLogs.source, "calendar")));
+  const event = allCalendarLogs.filter((l) => l.direction === "usage" && l.date.getTime() === log.date.getTime());
+  const others = allCalendarLogs.filter((l) => l.date.getTime() !== log.date.getTime());
+
+  for (const l of event) {
+    const [inv] = await db
+      .select()
+      .from(schema.feedInventory)
+      .where(and(eq(schema.feedInventory.farmId, session.farmId), eq(schema.feedInventory.feedType, l.feedType)))
+      .limit(1);
+    if (inv) {
+      await db
+        .update(schema.feedInventory)
+        .set({ stockKg: inv.stockKg + l.quantityKg })
+        .where(eq(schema.feedInventory.id, inv.id));
+    }
+    await db.delete(schema.feedLogs).where(and(eq(schema.feedLogs.farmId, session.farmId), eq(schema.feedLogs.id, l.id)));
+  }
+
+  const [plan] = await db
+    .select()
+    .from(schema.penFeedPlans)
+    .where(and(eq(schema.penFeedPlans.farmId, session.farmId), eq(schema.penFeedPlans.pen, log.pen)))
+    .limit(1);
+  if (plan && log.date.getTime() >= Math.max(0, ...others.map((l) => l.date.getTime()))) {
+    // Reversing the pen's latest top-up: rewind the cycle. It can't be
+    // later than "due now" — the top-up was only allowed once it was due.
+    const dueNow = Date.now() - plan.durationDays * 86400000;
+    const prev = Math.max(0, ...others.map((l) => l.date.getTime()));
+    const restored = new Date(prev > 0 ? Math.min(prev, dueNow) : dueNow);
+    await db.update(schema.penFeedPlans).set({ startDate: restored, updatedAt: new Date() }).where(eq(schema.penFeedPlans.id, plan.id));
+  }
+
+  const totalKg = event.reduce((s, l) => s + l.quantityKg, 0);
+  await logActivity(
+    session,
+    "Reversed feeding",
+    `${log.pen} — ${event.map((l) => `${fmtWeight(l.quantityKg, unit, 0)} ${l.feedType}`).join(", ")} put back in stock (${fmtWeight(totalKg, unit, 0)})`,
+    "/app/feed"
+  );
+
+  revalidatePath("/app/feed");
+  revalidatePath("/app");
+  redirect("/app/feed?reversed=1");
 }

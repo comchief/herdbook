@@ -9,6 +9,7 @@ import {
   deleteFeedLogAction,
   assignPenFeedAction,
   logPenFeedingAction,
+  reverseFeedingAction,
 } from "@/lib/actions/feed";
 import { Gauge } from "@/components/charts";
 import { fmtDate } from "@/lib/format";
@@ -32,14 +33,15 @@ function daysBetween(a: Date, b: Date) {
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; logged?: string }>;
+  searchParams: Promise<{ error?: string; logged?: string; reversed?: string }>;
 }) {
   const session = await requireSession();
   const farm = await requireActiveFarm(session);
   const unit = farm.unit === "lbs" ? "lbs" : "kg";
   const unitLabel = weightUnitLabel(unit);
-  const { error, logged } = await searchParams;
+  const { error, logged, reversed } = await searchParams;
   const isManager = session.role !== "worker";
+  const isOwner = session.role === "owner";
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
@@ -64,6 +66,7 @@ export default async function FeedPage({
       <p className="text-ink-soft text-sm mb-6">Stock levels, reorder points and consumption.</p>
       {error && <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>}
       {logged === "1" && <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">Feeding logged for today.</div>}
+      {reversed === "1" && <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">Feeding reversed — the feed was put back in stock.</div>}
 
       <div className="card p-5 mb-6">
         <h2 className="font-bold mb-3">Inventory on hand</h2>
@@ -243,6 +246,27 @@ export default async function FeedPage({
                             </form>
                           );
                         })()}
+                      {isOwner &&
+                        (() => {
+                          // The pen's latest calendar feeding — today's for a
+                          // per-pig pen, the most recent top-up for a bulk
+                          // pen (logs is already newest-first).
+                          const last = logs.find(
+                            (l) =>
+                              l.pen === penName &&
+                              l.source === "calendar" &&
+                              (plan ? true : l.date.toISOString().slice(0, 10) === todayStr)
+                          );
+                          if (!last) return null;
+                          return (
+                            <form action={reverseFeedingAction} className="inline ml-2">
+                              <input type="hidden" name="id" value={last.id} />
+                              <button type="submit" className="btn btn-small" title="Undo the last logged feeding and put the feed back in stock">
+                                Reverse
+                              </button>
+                            </form>
+                          );
+                        })()}
                       {isManager && (
                         <details className="relative inline-block ml-2">
                           <summary className="btn btn-small cursor-pointer list-none">{plan ? "Edit feeding" : "Assign feeding"}</summary>
@@ -349,7 +373,15 @@ export default async function FeedPage({
                     </td>
                     <td className="num">{fmtWeight(l.quantityKg, unit, 0)}</td>
                     <td className="num">{l.costTotal ? `$${l.costTotal.toFixed(2)}` : "—"}</td>
-                    <td className="text-right">
+                    <td className="text-right whitespace-nowrap">
+                      {isOwner && l.source === "calendar" && l.direction === "usage" && (
+                        <form action={reverseFeedingAction} className="inline mr-2">
+                          <input type="hidden" name="id" value={l.id} />
+                          <button type="submit" className="btn btn-small" title={`Reverse this feeding (${l.pen}) and put the feed back in stock`}>
+                            Reverse
+                          </button>
+                        </form>
+                      )}
                       <form action={deleteFeedLogAction} className="inline">
                         <input type="hidden" name="id" value={l.id} />
                         <button type="submit" className="btn btn-small btn-danger">
