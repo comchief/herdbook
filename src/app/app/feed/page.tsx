@@ -15,6 +15,8 @@ import { Gauge } from "@/components/charts";
 import { fmtDate } from "@/lib/format";
 import { displayValue, weightUnitLabel, fmtWeight, kgCostToDisplay } from "@/lib/units";
 import { PenFeedFields } from "@/components/pen-feed-fields";
+import { splitByMonth } from "@/lib/month-groups";
+import { MonthGroup } from "@/components/month-group";
 
 /** Renders a stored duration (e.g. `{ value: 2, unit: "weeks" }`) back the
  * way it was entered — "2 weeks", "1 month" — rather than as the days it
@@ -59,6 +61,37 @@ export default async function FeedPage({
     pens.get(pen)!.push(p);
   }
   const bulkPlans = new Map(bulkPlanRows.map((p) => [p.pen, p]));
+
+  // Only this month's feed movements are listed row by row; every earlier
+  // month collapses into one expandable summary row.
+  const { current: currentLogs, past: pastLogMonths } = splitByMonth(logs, (l) => l.date);
+  const logRow = (l: (typeof logs)[number]) => (
+    <tr key={l.id}>
+      <td>{fmtDate(l.date)}</td>
+      <td>{l.feedType}</td>
+      <td>
+        <span className={`badge ${l.direction === "purchase" ? "badge-good" : "badge-muted"}`}>{l.direction}</span>
+      </td>
+      <td className="num">{fmtWeight(l.quantityKg, unit, 0)}</td>
+      <td className="num">{l.costTotal ? `$${l.costTotal.toFixed(2)}` : "—"}</td>
+      <td className="text-right whitespace-nowrap">
+        {isOwner && l.source === "calendar" && l.direction === "usage" && (
+          <form action={reverseFeedingAction} className="inline mr-2">
+            <input type="hidden" name="id" value={l.id} />
+            <button type="submit" className="btn btn-small" title={`Reverse this feeding (${l.pen}) and put the feed back in stock`}>
+              Reverse
+            </button>
+          </form>
+        )}
+        <form action={deleteFeedLogAction} className="inline">
+          <input type="hidden" name="id" value={l.id} />
+          <button type="submit" className="btn btn-small btn-danger">
+            Delete
+          </button>
+        </form>
+      </td>
+    </tr>
+  );
 
   return (
     <div>
@@ -364,33 +397,7 @@ export default async function FeedPage({
                 </tr>
               </thead>
               <tbody>
-                {logs.map((l) => (
-                  <tr key={l.id}>
-                    <td>{fmtDate(l.date)}</td>
-                    <td>{l.feedType}</td>
-                    <td>
-                      <span className={`badge ${l.direction === "purchase" ? "badge-good" : "badge-muted"}`}>{l.direction}</span>
-                    </td>
-                    <td className="num">{fmtWeight(l.quantityKg, unit, 0)}</td>
-                    <td className="num">{l.costTotal ? `$${l.costTotal.toFixed(2)}` : "—"}</td>
-                    <td className="text-right whitespace-nowrap">
-                      {isOwner && l.source === "calendar" && l.direction === "usage" && (
-                        <form action={reverseFeedingAction} className="inline mr-2">
-                          <input type="hidden" name="id" value={l.id} />
-                          <button type="submit" className="btn btn-small" title={`Reverse this feeding (${l.pen}) and put the feed back in stock`}>
-                            Reverse
-                          </button>
-                        </form>
-                      )}
-                      <form action={deleteFeedLogAction} className="inline">
-                        <input type="hidden" name="id" value={l.id} />
-                        <button type="submit" className="btn btn-small btn-danger">
-                          Delete
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
+                {currentLogs.map(logRow)}
                 {logs.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center text-muted py-8">
@@ -398,7 +405,30 @@ export default async function FeedPage({
                     </td>
                   </tr>
                 )}
+                {logs.length > 0 && currentLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-muted py-6">
+                      No feed movements this month.
+                    </td>
+                  </tr>
+                )}
               </tbody>
+              {pastLogMonths.map((m) => {
+                const bought = m.items.filter((l) => l.direction === "purchase").reduce((sum, l) => sum + l.quantityKg, 0);
+                const used = m.items.filter((l) => l.direction !== "purchase").reduce((sum, l) => sum + l.quantityKg, 0);
+                const spent = m.items.filter((l) => l.direction === "purchase").reduce((sum, l) => sum + l.costTotal, 0);
+                return (
+                  <MonthGroup
+                    key={m.key}
+                    label={m.label}
+                    detail={`${m.items.length} movement${m.items.length === 1 ? "" : "s"} · bought ${fmtWeight(bought, unit, 0)} · used ${fmtWeight(used, unit, 0)}`}
+                    leadSpan={3}
+                    trailing={["", spent ? `$${spent.toFixed(2)}` : "—", ""]}
+                  >
+                    {m.items.map(logRow)}
+                  </MonthGroup>
+                );
+              })}
             </table>
           </div>
         </div>

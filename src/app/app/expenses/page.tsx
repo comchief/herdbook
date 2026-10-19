@@ -7,6 +7,8 @@ import { createCapitalContributionAction, deleteCapitalContributionAction } from
 import { Icon } from "@/components/icons";
 import { fmtDate } from "@/lib/format";
 import { fmtMoney } from "@/lib/currency";
+import { splitByMonth } from "@/lib/month-groups";
+import { MonthGroup } from "@/components/month-group";
 
 const CAPITAL_TYPE_LABEL: Record<string, string> = {
   "owner-equity": "Owner equity",
@@ -46,6 +48,29 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   // above entirely (see the schema doc comment on capitalContributions).
   const totalInvested = capitalContributions.reduce((s, c) => s + c.amount, 0);
   const ytdInvested = capitalContributions.filter((c) => c.date.getFullYear().toString() === yr).reduce((s, c) => s + c.amount, 0);
+
+  // Only this month's expenses are listed row by row; every earlier month
+  // collapses into one expandable summary row.
+  const { current: currentExpenses, past: pastExpenseMonths } = splitByMonth(expenses, (e) => e.date);
+  const expenseRow = (e: (typeof expenses)[number]) => (
+    <tr key={e.id}>
+      <td>{fmtDate(e.date)}</td>
+      <td>
+        <span className="badge badge-muted">{e.category}</span>
+      </td>
+      <td>{e.description}</td>
+      <td>{e.vendor || "—"}</td>
+      <td className="font-semibold num">{fmtMoney(e.amount, farm.currency)}</td>
+      <td className="text-right">
+        <form action={deleteExpenseAction} className="inline">
+          <input type="hidden" name="id" value={e.id} />
+          <button type="submit" className="btn btn-small btn-danger">
+            Delete
+          </button>
+        </form>
+      </td>
+    </tr>
+  );
 
   return (
     <div>
@@ -123,25 +148,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             </tr>
           </thead>
           <tbody>
-            {expenses.map((e) => (
-              <tr key={e.id}>
-                <td>{fmtDate(e.date)}</td>
-                <td>
-                  <span className="badge badge-muted">{e.category}</span>
-                </td>
-                <td>{e.description}</td>
-                <td>{e.vendor || "—"}</td>
-                <td className="font-semibold num">{fmtMoney(e.amount, farm.currency)}</td>
-                <td className="text-right">
-                  <form action={deleteExpenseAction} className="inline">
-                    <input type="hidden" name="id" value={e.id} />
-                    <button type="submit" className="btn btn-small btn-danger">
-                      Delete
-                    </button>
-                  </form>
-                </td>
-              </tr>
-            ))}
+            {currentExpenses.map(expenseRow)}
             {expenses.length === 0 && (
               <tr>
                 <td colSpan={6} className="text-center text-muted py-10">
@@ -149,7 +156,25 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                 </td>
               </tr>
             )}
+            {expenses.length > 0 && currentExpenses.length === 0 && (
+              <tr>
+                <td colSpan={6} className="text-center text-muted py-6">
+                  No expenses logged this month.
+                </td>
+              </tr>
+            )}
           </tbody>
+          {pastExpenseMonths.map((m) => (
+            <MonthGroup
+              key={m.key}
+              label={m.label}
+              detail={`${m.items.length} expense${m.items.length === 1 ? "" : "s"}`}
+              leadSpan={4}
+              trailing={[fmtMoney(m.items.reduce((sum, e) => sum + e.amount, 0), farm.currency), ""]}
+            >
+              {m.items.map(expenseRow)}
+            </MonthGroup>
+          ))}
         </table>
       </div>
 
