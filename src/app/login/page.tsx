@@ -5,9 +5,9 @@ import { IconSprite, Icon } from "@/components/icons";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, reset } = await searchParams;
   return (
     <div className="flex-1 flex items-center justify-center bg-bg px-4 py-10">
       <IconSprite />
@@ -22,6 +22,9 @@ export default async function LoginPage({
         {error && (
           <div className="mb-4 text-sm text-critical bg-[#fbdada] rounded-lg px-3 py-2">{error}</div>
         )}
+        {reset && (
+          <div className="mb-4 text-sm text-good bg-accent-soft rounded-lg px-3 py-2">Password updated — log in with your new password.</div>
+        )}
         <form action={loginAction} className="space-y-4">
           <div className="field">
             <label>Email</label>
@@ -30,6 +33,11 @@ export default async function LoginPage({
           <div className="field">
             <label>Password</label>
             <input name="password" type="password" required />
+            <div className="text-right mt-1.5">
+              <Link href="/forgot-password" className="text-xs text-accent font-semibold">
+                Forgot password?
+              </Link>
+            </div>
           </div>
           <button type="submit" className="btn btn-primary w-full justify-center" style={{ padding: "11px" }}>
             Log in

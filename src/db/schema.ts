@@ -228,6 +228,26 @@ export const breedingRecords = pgTable(
   (t) => [index("breeding_farm_idx").on(t.farmId)]
 );
 
+/** One-time "forgot password" links. Only a SHA-256 hash of the token is
+ * stored (the raw token exists only in the emailed link), so a database
+ * leak can't be turned into working reset links. A token is valid until
+ * expiresAt and only until it is used; requesting a new link voids older
+ * unused ones (see src/lib/actions/password-reset.ts). */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("pwreset_token_hash_idx").on(t.tokenHash), index("pwreset_user_idx").on(t.userId)]
+);
+
 export const feedInventory = pgTable(
   "feed_inventory",
   {
